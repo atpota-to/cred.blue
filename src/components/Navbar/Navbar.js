@@ -117,7 +117,7 @@ const Navbar = () => {
     items: [
       { title: "score", path: "/" },
       { title: "compare", path: "/compare" },
-  //  { title: "leaderboard", path: "/leaderboard" },
+      { title: "leaderboard", path: "/leaderboard" },
       { title: "alt text rating", path: "/alt-text" },
       { title: "shortcut", path: "/shortcut" }
     ]

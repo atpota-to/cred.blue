@@ -40,7 +40,7 @@ const App = () => {
               <Route path="/newsletter" element={<Newsletter />} />
               <Route path="/supporter" element={<Supporter />} />
               <Route path="/definitions" element={<Definitions />} />
-              <Route path="/leaderboard" element={<Leaderboard />} />
+          {/*  <Route path="/leaderboard" element={<Leaderboard />} />  */}
               <Route path="/resources" element={<Resources />} />
               <Route path="/shortcut" element={<Shortcut />} />
               <Route path="/zen" element={<ZenPage />} />

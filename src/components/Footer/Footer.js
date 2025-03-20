@@ -20,10 +20,7 @@ const Footer = () => {
           >
             Made by @dame.is
           </a>
-        </div>
-        {/* Additional Info */}
-        <div className="footer-info">
-          <p>&copy; {new Date().getFullYear()} cred.blue. All rights reserved. <Link to="/zen" className="zen-link">Zen</Link>.</p>
+          <Link to="/zen" className="zen-link">Zen</Link>
         </div>
       </div>
     </footer>

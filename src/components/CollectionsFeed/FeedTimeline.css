@@ -1,0 +1,108 @@
+/* FeedTimeline.css */
+
+.feed-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .feed-item {
+    background-color: var(--navbar-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 15px;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  
+  .feed-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  .feed-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  
+  .collection-type {
+    display: flex;
+    align-items: center;
+  }
+  
+  .collection-name {
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--button-bg);
+  }
+  
+  .collection-full {
+    margin-left: 8px;
+    font-size: 0.8rem;
+    color: var(--text);
+    opacity: 0.6;
+  }
+  
+  .record-rkey {
+    font-family: monospace;
+    font-size: 0.9rem;
+    color: var(--text);
+    opacity: 0.8;
+    background-color: var(--background);
+    padding: 3px 8px;
+    border-radius: 4px;
+  }
+  
+  .feed-item-content {
+    padding: 5px 0;
+    margin-bottom: 10px;
+    border-top: 1px solid var(--card-border);
+    border-bottom: 1px solid var(--card-border);
+  }
+  
+  .record-type,
+  .record-subject,
+  .record-text {
+    margin: 8px 0;
+    font-size: 0.95rem;
+    color: var(--text);
+    word-break: break-word;
+  }
+  
+  .type-label,
+  .subject-label,
+  .text-label {
+    font-weight: 600;
+    color: var(--text);
+    margin-right: 5px;
+  }
+  
+  .feed-item-footer {
+    display: flex;
+    justify-content: flex-end;
+  }
+  
+  .record-timestamp {
+    font-size: 0.85rem;
+    color: var(--text);
+    opacity: 0.7;
+    font-style: italic;
+  }
+  
+  /* Responsive styles */
+  @media (max-width: 600px) {
+    .feed-item-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    
+    .record-rkey {
+      align-self: flex-start;
+    }
+    
+    .feed-item-content {
+      font-size: 0.9rem;
+    }
+  }

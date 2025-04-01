@@ -18,6 +18,7 @@ import AltTextRatingTool from './components/AltTextRating/AltTextRatingTool';
 import UserProfile from './components/UserProfile/UserProfile';
 import ZenPage from './components/ZenPage';
 import CompareScores from './components/CompareScores/CompareScores';
+import CollectionsFeed from './components/CollectionsFeed/CollectionsFeed';
 import AdminRoute from './components/Admin/AdminRoute';
 import "./App.css";
 
@@ -33,6 +34,8 @@ const App = () => {
               <Route path="/home" element={<Home />} />
               <Route path="/compare/:username1/:username2" element={<CompareScores />} />
               <Route path="/compare" element={<CompareScores />} />
+              <Route path="/collections-feed/:username" element={<CollectionsFeed />} />
+              <Route path="/collections-feed" element={<CollectionsFeed />} />
               <Route path="/alt-text" element={<AltTextRatingTool />} />
               <Route path="/about" element={<About />} />
               <Route path="/privacy" element={<Privacy />} />

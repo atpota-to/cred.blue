@@ -1,3 +1,4 @@
+// src/components/Navbar/Navbar.jsx
 import React, { useContext, useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ThemeContext } from '../../contexts/ThemeContext';
@@ -119,6 +120,7 @@ const Navbar = () => {
       { title: "compare", path: "/compare" },
       { title: "leaderboard", path: "/leaderboard" },
       { title: "alt text rating", path: "/alt-text" },
+      { title: "activity feed", path: "/collections-feed" },
       { title: "shortcut", path: "/shortcut" }
     ]
   };

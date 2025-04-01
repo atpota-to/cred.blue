@@ -39,6 +39,11 @@ const CollectionsFeed = () => {
       setLoading(true);
       setError('');
       
+      // Update URL with the username
+      if (userHandle !== username) {
+        navigate(`/collections-feed/${encodeURIComponent(userHandle)}`);
+      }
+      
       // Resolve handle to DID
       const userDid = await resolveHandleToDid(userHandle);
       setDid(userDid);
@@ -223,7 +228,23 @@ const CollectionsFeed = () => {
           <p className="intro-text">
             Enter a Bluesky handle to see their AT Protocol collection records in chronological order.
           </p>
-          <SearchBar onSearch={loadUserData} />
+          <div className="search-bar-container">
+            <form className="search-bar" onSubmit={(e) => {
+              e.preventDefault();
+              if (handle.trim() !== "") {
+                loadUserData(handle.trim());
+              }
+            }} role="search">
+              <input
+                type="text"
+                placeholder="(e.g. user.bsky.social)"
+                value={handle}
+                onChange={(e) => setHandle(e.target.value)}
+                required
+              />
+              <button type="submit">Search</button>
+            </form>
+          </div>
         </div>
       ) : (
         <>

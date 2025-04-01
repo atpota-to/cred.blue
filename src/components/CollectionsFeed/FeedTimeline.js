@@ -17,20 +17,13 @@ const FeedTimeline = ({ records }) => {
     }
   };
 
-  // Helper to get a readable collection name
-  const getCollectionDisplayName = (collection) => {
-    // Extract the last part of the collection name (e.g., 'like' from 'app.bsky.feed.like')
-    const parts = collection.split('.');
-    return parts[parts.length - 1];
-  };
-
   return (
     <div className="feed-timeline">
       {records.map((record, index) => (
         <div key={`${record.collection}-${record.rkey}-${index}`} className="feed-item">
           <div className="feed-item-header">
             <div className="collection-type">
-              <span className="collection-name">{getCollectionDisplayName(record.collection)}</span>
+              <span className="collection-name">{record.collection.split('.').pop()}</span>
               <span className="collection-full">{record.collection}</span>
             </div>
             <div className="record-rkey">{record.rkey}</div>

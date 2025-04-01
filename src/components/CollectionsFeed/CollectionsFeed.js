@@ -106,7 +106,8 @@ const CollectionsFeed = () => {
       
       // Fetch records for each collection in parallel
       const fetchPromises = collectionsList.map(async (collection) => {
-        let url = `${endpoint}/xrpc/com.atproto.repo.listRecords?repo=${encodeURIComponent(userDid)}&collection=${encodeURIComponent(collection)}&limit=10`;
+        // Limit to 5 records per collection initially (for 20 records total across ~4 collections)
+        let url = `${endpoint}/xrpc/com.atproto.repo.listRecords?repo=${encodeURIComponent(userDid)}&collection=${encodeURIComponent(collection)}&limit=5`;
         
         // Add cursor if loading more and we have a cursor for this collection
         if (isLoadMore && newCursors[collection]) {
@@ -155,6 +156,11 @@ const CollectionsFeed = () => {
         return new Date(b.timestamp) - new Date(a.timestamp);
       });
       
+      // If not loading more, limit to 20 most recent records
+      if (!isLoadMore) {
+        allRecords = allRecords.slice(0, 20);
+      }
+      
       setRecords(allRecords);
       setCollectionCursors(newCursors);
       setFetchingMore(false);
@@ -165,14 +171,12 @@ const CollectionsFeed = () => {
     }
   };
   
-  // Handle filter change
-  const handleFilterChange = (e) => {
-    const { value, checked } = e.target;
-    
-    if (checked) {
-      setSelectedCollections(prev => [...prev, value]);
+  // Toggle collection selection
+  const toggleCollection = (collection) => {
+    if (selectedCollections.includes(collection)) {
+      setSelectedCollections(prev => prev.filter(item => item !== collection));
     } else {
-      setSelectedCollections(prev => prev.filter(item => item !== value));
+      setSelectedCollections(prev => [...prev, collection]);
     }
   };
   
@@ -294,17 +298,19 @@ const CollectionsFeed = () => {
                   
                   <div className="collections-filter">
                     {collections.map(collection => (
-                      <div key={collection} className="collection-checkbox">
+                      <div 
+                        key={collection} 
+                        className={`collection-item ${selectedCollections.includes(collection) ? 'selected' : ''}`}
+                        onClick={() => toggleCollection(collection)}
+                      >
                         <input
                           type="checkbox"
-                          id={`collection-${collection}`}
-                          value={collection}
+                          className="collection-item-checkbox"
                           checked={selectedCollections.includes(collection)}
-                          onChange={handleFilterChange}
+                          onChange={() => {}} // Handled by the div onClick
+                          onClick={(e) => e.stopPropagation()}
                         />
-                        <label htmlFor={`collection-${collection}`}>
-                          {collection.split('.').pop()}
-                        </label>
+                        <span className="collection-item-name">{collection}</span>
                       </div>
                     ))}
                   </div>

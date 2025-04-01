@@ -3,7 +3,7 @@
  ***********************************************************************/
 
 // Resolve a handle (e.g., "dame.bsky.social") into a DID using the atproto resolveHandle endpoint.
-async function resolveHandleToDid(inputHandle) {
+export async function resolveHandleToDid(inputHandle) {
   const url = `${publicServiceEndpoint}/xrpc/com.atproto.identity.resolveHandle?handle=${encodeURIComponent(inputHandle)}`;
   const data = await getJSON(url);
   if (!data.did) {
@@ -13,7 +13,7 @@ async function resolveHandleToDid(inputHandle) {
 }
 
 // Get the service endpoint for the DID by querying either the PLC directory or (for did:web identities) the well-known DID document.
-async function getServiceEndpointForDid(resolvedDid) {
+export async function getServiceEndpointForDid(resolvedDid) {
   let url;
   
   if (resolvedDid.startsWith("did:web:")) {

@@ -3,14 +3,15 @@ import './FeedTimeline.css';
 import { formatDistanceToNow } from 'date-fns';
 
 const FeedTimeline = ({ records, serviceEndpoint }) => {
-  if (!records || records.length === 0) {
-    return null;
-  }
-
+  // Define all hooks at the top level, before any conditionals
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [modalData, setModalData] = useState(null);
   const [modalLoading, setModalLoading] = useState(false);
   const [modalError, setModalError] = useState(null);
+  
+  if (!records || records.length === 0) {
+    return null;
+  }
 
   // Helper to format the timestamp as a relative time
   const formatRelativeTime = (timestamp) => {

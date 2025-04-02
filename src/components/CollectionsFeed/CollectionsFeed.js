@@ -14,8 +14,9 @@ const CollectionsFeed = () => {
   const navigate = useNavigate();
   const { isAuthenticated, checkAuthStatus } = useAuth();
   
-  // State variables
+  // Initialize state variables
   const [handle, setHandle] = useState(username || '');
+  const [searchTerm, setSearchTerm] = useState(username || '');
   const [displayName, setDisplayName] = useState('');
   const [did, setDid] = useState('');
   const [serviceEndpoint, setServiceEndpoint] = useState('');
@@ -104,23 +105,27 @@ const CollectionsFeed = () => {
   // Define fetchCollectionRecords with useCallback first
   const fetchCollectionRecords = useCallback(async (userDid, endpoint, collectionsList, isLoadMore = false) => {
     try {
-      setFetchingMore(isLoadMore);
-      
-      // Set chartLoading for initial load or when refreshing
-      if (!isLoadMore || collectionsList.length > 0) {
+      if (!isLoadMore) {
         setChartLoading(true);
       }
       
-      // Arrays to store all fetched records
-      let allRecords = isLoadMore ? [...records] : [];
-      let allChartRecords = isLoadMore ? [...allRecordsForChart] : [];
+      // Skip if no collections selected
+      if (!collectionsList || collectionsList.length === 0) {
+        console.log('No collections to fetch');
+        setFetchingMore(false);
+        setChartLoading(false);
+        return;
+      }
+      
+      console.log(`Fetching records for ${collectionsList.length} collections:`, collectionsList);
+
+      // Create a copy of the cursors
       const newCursors = { ...collectionCursors };
       
-      // Calculate a cutoff date (90 days ago by default for chart visualization)
-      const cutoffDate = new Date();
-      cutoffDate.setDate(cutoffDate.getDate() - 90); // 3 months
+      let allRecords = [];
+      let allChartRecords = [];
       
-      // Flag to track if we're doing a deep initial load for chart data
+      // Check if we need full history for the initial deep load
       const isInitialDeepLoad = !isLoadMore && allRecordsForChart.length === 0;
       
       // Sequential processing for each collection to avoid overloading the API
@@ -145,112 +150,109 @@ const CollectionsFeed = () => {
             url += `&cursor=${encodeURIComponent(cursor)}`;
           }
           
-          const response = await fetch(url, {
-            credentials: 'include'
-          });
-          
-          if (!response.ok) {
-            if (response.status === 401) {
-              // Handle unauthorized
-              checkAuthStatus();
-              throw new Error('Authentication required. Please log in again.');
-            }
-            console.error(`Error fetching records for ${collection}: ${response.statusText}`);
-            break;
-          }
-          
-          const data = await response.json();
-          pageCount++;
-          
-          // Process records from this page
-          if (data.records && data.records.length > 0) {
-            const processedRecords = data.records.map(record => {
-              const contentTimestamp = extractTimestamp(record);
-              const rkey = record.uri.split('/').pop();
-              const rkeyTimestamp = tidToTimestamp(rkey);
-              
-              return {
-                ...record,
-                collection,
-                collectionType: record.value?.$type || collection,
-                contentTimestamp,
-                rkeyTimestamp,
-                rkey,
-              };
+          try {
+            // Verify authentication before making the request
+            await checkAuthStatus();
+            
+            const response = await fetch(url, {
+              credentials: 'include'
             });
             
-            // For deep load, check if we've reached records beyond our cutoff
-            if (isInitialDeepLoad) {
-              const oldestRecordTime = processedRecords.reduce((oldest, record) => {
-                const timestamp = record.contentTimestamp || record.rkeyTimestamp;
-                if (!timestamp) return oldest;
-                
-                const recordTime = new Date(timestamp).getTime();
-                return recordTime < oldest ? recordTime : oldest;
-              }, Date.now());
+            if (!response.ok) {
+              if (response.status === 401) {
+                // Handle unauthorized
+                await checkAuthStatus();
+                if (!isAuthenticated) {
+                  throw new Error('Authentication required. Please log in again.');
+                }
+                // If we're still authenticated, retry this request
+                continue;
+              }
               
-              // For commonly used collections like likes, follows, etc.,
-              // we need to be more cautious about when to stop paginating
-              const isHighVolumeCollection = collection.includes('like') || 
-                                            collection.includes('follow') || 
-                                            collection.includes('repost');
+              // Try to parse the error response
+              const errorData = await response.json().catch(() => null);
+              const errorMessage = errorData?.error || errorData?.details || response.statusText;
+              console.error(`Error fetching records for ${collection}: ${errorMessage}`);
+              
+              // Skip this collection but continue with others
+              break;
+            }
+            
+            const data = await response.json();
+            pageCount++;
+            
+            // Process each record to extract timestamps
+            if (data.records && data.records.length > 0) {
+              // Process and add timestamps to records
+              const processedRecords = data.records.map(record => {
+                const contentTimestamp = extractTimestamp(record);
+                const rkey = record.uri.split('/').pop();
+                const rkeyTimestamp = tidToTimestamp(rkey);
                 
-              // If the oldest record on this page is older than our cutoff, and
-              // 1. It's not a high volume collection, OR
-              // 2. It's a high volume collection but we've already gone through several pages
-              if (oldestRecordTime < cutoffDate.getTime() && 
-                  (!isHighVolumeCollection || pageCount > 5)) {
-                reachedCutoff = true;
-                console.log(`Reached cutoff date for ${collection} on page ${pageCount} (oldest: ${new Date(oldestRecordTime).toISOString()})`);
+                return {
+                  ...record,
+                  collection,
+                  collectionType: record.value?.$type || collection,
+                  contentTimestamp,
+                  rkeyTimestamp,
+                  rkey,
+                };
+              });
+              
+              // Add records to our collection records array
+              collectionRecords = [...collectionRecords, ...processedRecords];
+              
+              // Check if we need to continue fetching more pages for this collection
+              if (data.cursor && isInitialDeepLoad) {
+                cursor = data.cursor;
                 
-                // Filter records from this page to only include those after cutoff
-                const filteredRecords = processedRecords.filter(record => {
-                  const timestamp = record.contentTimestamp || record.rkeyTimestamp;
-                  if (!timestamp) return false;
-                  return new Date(timestamp) >= cutoffDate;
-                });
+                // Check if we've reached our history cutoff date
+                const oldestRecord = processedRecords[processedRecords.length - 1];
+                const timestamp = useRkeyTimestamp ? oldestRecord.rkeyTimestamp : oldestRecord.contentTimestamp;
                 
-                console.log(`  - Kept ${filteredRecords.length} of ${processedRecords.length} records from final page`);
-                collectionRecords.push(...filteredRecords);
+                if (timestamp) {
+                  const recordDate = new Date(timestamp);
+                  const cutoffDate = new Date();
+                  cutoffDate.setDate(cutoffDate.getDate() - 90); // 90 days ago
+                  
+                  if (recordDate < cutoffDate) {
+                    console.log(`Reached cutoff date for ${collection}, stopping pagination`);
+                    reachedCutoff = true;
+                  }
+                }
               } else {
-                // All records on this page are within our date range 
-                // OR we need to keep paginating through high-volume collections
-                collectionRecords.push(...processedRecords);
+                hasMoreRecords = false;
               }
             } else {
-              // For regular browsing, include all records from the page
-              collectionRecords.push(...processedRecords);
+              hasMoreRecords = false;
             }
-          }
-          
-          // Check if there are more pages
-          if (data.cursor) {
-            cursor = data.cursor;
-          } else {
-            hasMoreRecords = false;
-          }
-          
-          // If we're not doing deep historical loading, stop after first page
-          if (!isInitialDeepLoad) {
+            
+            // Store the cursor for this collection for future "load more" operations
+            newCursors[collection] = data.cursor;
+          } catch (err) {
+            console.error(`Error fetching page ${pageCount} for collection ${collection}:`, err);
+            // Break the pagination loop for this collection, but continue with others
             break;
           }
-        }
+        } // End of pagination while loop
         
-        // Save the cursor for this collection for future pagination
-        if (cursor) {
-          newCursors[collection] = cursor;
-        } else {
-          // No more records for this collection
-          delete newCursors[collection];
-        }
-        
-        // Add records to appropriate arrays
+        // Add all records from this collection to our full records arrays
         allChartRecords = [...allChartRecords, ...collectionRecords];
         
         // For display timeline, we might want to be more selective
         if (isLoadMore || !isInitialDeepLoad) {
           allRecords = [...allRecords, ...collectionRecords];
         }
+      } // End of collections for loop
+      
+      // If we didn't get any records, set an error
+      if (allChartRecords.length === 0 && !isLoadMore) {
+        setError('No records found for the selected collections.');
+      } else if (isLoadMore && allRecords.length === 0) {
+        setError('No more records available.');
+      } else {
+        // Clear any previous error since we got records
+        setError('');
       }
       
       // Filter and sort records based on selected timestamp source
@@ -320,12 +322,12 @@ const CollectionsFeed = () => {
       
     } catch (err) {
       console.error('Error fetching collection records:', err);
-      setError('Failed to fetch records. Please try again.');
+      setError('Failed to fetch records. ' + (err.message || 'Please try again.'));
       setFetchingMore(false);
       setChartLoading(false); // Always reset on error
       throw err; // Re-throw to allow handling in calling functions
     }
-  }, [records, allRecordsForChart, collectionCursors, useRkeyTimestamp, checkAuthStatus]);
+  }, [records, allRecordsForChart, collectionCursors, useRkeyTimestamp, checkAuthStatus, isAuthenticated]);
   
   // Now define loadUserData after fetchCollectionRecords is defined
   const loadUserData = useCallback(async (userHandle) => {
@@ -339,40 +341,94 @@ const CollectionsFeed = () => {
       }
       
       // Resolve handle to DID
-      const userDid = await resolveHandleToDid(userHandle);
-      setDid(userDid);
+      let userDid;
+      try {
+        userDid = await resolveHandleToDid(userHandle);
+        setDid(userDid);
+      } catch (resolveError) {
+        console.error('Error resolving handle to DID:', resolveError);
+        setError(`Could not resolve handle "${userHandle}". Please check the handle and try again.`);
+        setInitialLoad(false);
+        setLoading(false);
+        return;
+      }
       
       // Get service endpoint
-      const endpoint = await getServiceEndpointForDid(userDid);
-      setServiceEndpoint(endpoint);
+      let endpoint;
+      try {
+        endpoint = await getServiceEndpointForDid(userDid);
+        setServiceEndpoint(endpoint);
+      } catch (endpointError) {
+        console.error('Error getting service endpoint:', endpointError);
+        setError(`Could not determine PDS endpoint for "${userHandle}". The user's server may be offline.`);
+        setInitialLoad(false);
+        setLoading(false);
+        return;
+      }
       
       // Fetch profile information
-      const publicApiEndpoint = "https://public.api.bsky.app";
-      const profileResponse = await fetch(`${publicApiEndpoint}/xrpc/app.bsky.actor.getProfile?actor=${encodeURIComponent(userDid)}`);
-      
-      if (!profileResponse.ok) {
-        throw new Error(`Error fetching profile: ${profileResponse.statusText}`);
+      try {
+        const publicApiEndpoint = "https://public.api.bsky.app";
+        const profileResponse = await fetch(`${publicApiEndpoint}/xrpc/app.bsky.actor.getProfile?actor=${encodeURIComponent(userDid)}`);
+        
+        if (!profileResponse.ok) {
+          throw new Error(`Error fetching profile: ${profileResponse.statusText}`);
+        }
+        
+        const profileData = await profileResponse.json();
+        setHandle(profileData.handle);
+        setDisplayName(profileData.displayName || profileData.handle);
+      } catch (profileError) {
+        console.error('Error fetching profile:', profileError);
+        // Continue without profile data, not critical
       }
-      
-      const profileData = await profileResponse.json();
-      setHandle(profileData.handle);
-      setDisplayName(profileData.displayName || profileData.handle);
       
       // Use our server-side API to fetch collections
-      const collectionsResponse = await fetch(`/api/collections/${encodeURIComponent(userDid)}?endpoint=${encodeURIComponent(endpoint)}`, {
-        credentials: 'include'
-      });
+      let retryCount = 0;
+      const maxRetries = 2;
+      let collectionsData;
       
-      if (!collectionsResponse.ok) {
-        if (collectionsResponse.status === 401) {
-          // Handle unauthorized
-          checkAuthStatus();
-          throw new Error('Authentication required. Please log in again.');
+      while (retryCount <= maxRetries) {
+        try {
+          // Verify authentication before making the request
+          await checkAuthStatus();
+          
+          const collectionsResponse = await fetch(`/api/collections/${encodeURIComponent(userDid)}?endpoint=${encodeURIComponent(endpoint)}`, {
+            credentials: 'include'
+          });
+          
+          if (!collectionsResponse.ok) {
+            if (collectionsResponse.status === 401) {
+              // Handle unauthorized
+              console.log('Authentication required, checking status and redirecting if needed');
+              await checkAuthStatus();
+              if (!isAuthenticated) {
+                throw new Error('Authentication required. Please log in again.');
+              }
+              // If we're still here, try again
+              retryCount++;
+              continue;
+            }
+            
+            // Try to parse the error response
+            const errorData = await collectionsResponse.json().catch(() => null);
+            const errorMessage = errorData?.error || errorData?.details || collectionsResponse.statusText;
+            throw new Error(`Error fetching collections: ${errorMessage}`);
+          }
+          
+          collectionsData = await collectionsResponse.json();
+          break; // Success, exit the retry loop
+        } catch (err) {
+          console.error(`Attempt ${retryCount + 1} failed:`, err);
+          if (retryCount === maxRetries) {
+            // This was our last attempt, propagate the error
+            throw err;
+          }
+          // Wait before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+          retryCount++;
         }
-        throw new Error(`Error fetching collections: ${collectionsResponse.statusText}`);
       }
-      
-      const collectionsData = await collectionsResponse.json();
       
       if (collectionsData.collections && collectionsData.collections.length > 0) {
         const sortedCollections = [...collectionsData.collections].sort();
@@ -381,7 +437,13 @@ const CollectionsFeed = () => {
         setSelectedCollections(sortedCollections);
         
         // Fetch records for each collection
-        await fetchCollectionRecords(userDid, endpoint, sortedCollections);
+        try {
+          await fetchCollectionRecords(userDid, endpoint, sortedCollections);
+        } catch (recordsError) {
+          console.error('Error fetching collection records:', recordsError);
+          setError(`Successfully loaded collections, but could not load records: ${recordsError.message}`);
+          // Continue with the collections we have
+        }
       } else {
         setError('No collections found for this user.');
       }
@@ -395,7 +457,7 @@ const CollectionsFeed = () => {
       setInitialLoad(false);
       setLoading(false);
     }
-  }, [username, navigate, checkAuthStatus, fetchCollectionRecords]);
+  }, [username, navigate, checkAuthStatus, fetchCollectionRecords, isAuthenticated]);
   
   // Now place useEffects after all the callbacks are defined
   
@@ -643,6 +705,14 @@ const CollectionsFeed = () => {
   );
   const canLoadMore = hasMoreRecordsLocally || hasMoreRecordsRemotely;
   
+  // Add the handleSubmit function
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (searchTerm.trim() !== '') {
+      loadUserData(searchTerm.trim());
+    }
+  };
+  
   return (
     <div className="collections-feed-container">
       <Helmet>
@@ -650,326 +720,182 @@ const CollectionsFeed = () => {
         <meta name="description" content={username ? `View ${username}'s AT Protocol collection records in chronological order` : 'View AT Protocol collection records in chronological order'} />
       </Helmet>
       
-      {initialLoad && !username ? (
-        <div className="omni-card alt-card">
-          <h1>Bluesky Omnifeed</h1>
-          <p>
-            View and analyze any Bluesky account's AT Protocol collection records chronologically.
-          </p>
-          <form className="search-bar" onSubmit={(e) => {
-            e.preventDefault();
-            if (handle.trim() !== "") {
-              loadUserData(handle.trim());
-            }
-          }} role="search">
-            <div>
-              <input
-                type="text"
-                placeholder="(e.g. user.bsky.social)"
-                value={handle}
-                onChange={(e) => setHandle(e.target.value)}
-                required
-              />
-            </div>
-            <div className="action-row">
-              <button className="analyze-button" type="submit">Analyze</button>
-            </div>
-          </form>
-          
-          <div className="omni-info-card">
-            <h3>What is Omnifeed?</h3>
-            <p>Omnifeed provides a chronological view of a user's entire ATProto repository, including all collections such as posts, likes, follows, and more. It helps you analyze account history and activity patterns.</p>
+      <div className="search-container">
+        <h1>OmniFeed</h1>
+        <p className="feed-description">
+          View all repository collections for a Bluesky user, including custom collections from AT Protocol apps.
+        </p>
+        
+        {/* Authentication status banner */}
+        {!isAuthenticated && (
+          <div className="auth-warning">
+            <p>
+              <strong>Authentication Required:</strong> You need to be logged in to view the OmniFeed.
+              Redirecting to login...
+            </p>
           </div>
-        </div>
-      ) : (
-        <>
-          {loading && !fetchingMore ? (
-            <div className="loading-container">
-              <MatterLoadingAnimation />
-            </div>
-          ) : error ? (
-            <div className="error-container">
-              <h2>Error</h2>
-              <p className="error-message">{error}</p>
+        )}
+        
+        <form onSubmit={handleSubmit} className="search-form">
+          <div className="search-box">
+            <input 
+              type="text" 
+              placeholder="Enter a Bluesky handle (e.g. cred.blue)" 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              disabled={loading}
+            />
+            <button 
+              type="submit" 
+              disabled={loading || !searchTerm || searchTerm.trim() === ''}
+            >
+              {loading ? 'Loading...' : 'Search'}
+            </button>
+          </div>
+        </form>
+        
+        {/* Error message with retry option */}
+        {error && (
+          <div className="error-message">
+            <p><strong>Error:</strong> {error}</p>
+            {did && serviceEndpoint && (
               <button 
-                className="try-again-button"
-                onClick={() => navigate('/omnifeed')}
+                onClick={() => loadUserData(handle || searchTerm)}
+                className="retry-button"
               >
-                Try Another Account
+                Retry
               </button>
-            </div>
-          ) : searchPerformed && (
-            <div className="feed-container">
-              <div className="page-title">
-                <h1>Omnifeed</h1>
-              </div>
-              <div className="user-header">
-                <h1>{displayName}</h1>
-                <h2>@{handle}</h2>
-                {did && (
-                  <div className="user-did">
-                    <span>DID: {did}</span>
-                    <button 
-                      className="copy-button"
-                      onClick={(event) => {
-                        navigator.clipboard.writeText(did);
-                        // Show temporary success message
-                        const button = event.currentTarget;
-                        button.classList.add('copied');
-                        setTimeout(() => button.classList.remove('copied'), 2000);
-                      }}
-                      title="Copy DID"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                      </svg>
-                    </button>
-                  </div>
-                )}
-                {serviceEndpoint && (
-                  <div className="user-endpoint">
-                    <span>Service: {serviceEndpoint}</span>
-                    <button 
-                      className="copy-button"
-                      onClick={(event) => {
-                        navigator.clipboard.writeText(serviceEndpoint);
-                        // Show temporary success message
-                        const button = event.currentTarget;
-                        button.classList.add('copied');
-                        setTimeout(() => button.classList.remove('copied'), 2000);
-                      }}
-                      title="Copy Service Endpoint"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                      </svg>
-                    </button>
-                  </div>
-                )}
-              </div>
-              
-              {/* Activity Chart */}
-              <ActivityChart 
-                records={filteredChartRecords} 
-                collections={selectedCollections}
-                loading={chartLoading}
-                key={`chart-${Date.now()}-${filteredChartRecords.length}-${selectedCollections.join(',')}`} // Use timestamp in key to ensure re-render on refresh
-              />
-              
-              <div className="feed-controls">
-                <div className="filter-container">
-                  <div 
-                    className="filter-dropdown-toggle"
-                    onClick={() => setDropdownOpen(!dropdownOpen)}
-                  >
-                    <span>
-                      Filter Collections
-                      {selectedCollections.length > 0 && (
-                        <span className="selected-collections-count">
-                          {selectedCollections.length}
-                        </span>
-                      )}
+            )}
+          </div>
+        )}
+        
+        {/* Initial loading state */}
+        {initialLoad && !error && (
+          <div className="loading-indicator">
+            <div className="spinner"></div>
+            <p>Connecting to AT Protocol services...</p>
+          </div>
+        )}
+        
+        {/* Main content once search is performed */}
+        {searchPerformed && !initialLoad && (
+          <div className="user-info">
+            {displayName && (
+              <h2>
+                Collections for {displayName}
+                <span className="handle">@{handle}</span>
+              </h2>
+            )}
+            
+            {/* Collections count and timeframe */}
+            {collections.length > 0 && (
+              <div className="collections-meta">
+                <p>{collections.length} collections found</p>
+                <div className="time-toggle">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={useRkeyTimestamp}
+                      onChange={() => setUseRkeyTimestamp(!useRkeyTimestamp)}
+                    />
+                    Use record IDs for timestamps
+                  </label>
+                  <span className="info-tooltip">
+                    ?
+                    <span className="tooltip-text">
+                      Toggle between using timestamps found within the content (more accurate) or derived from record IDs (complete coverage)
                     </span>
-                    <span className={`arrow ${dropdownOpen ? 'open' : ''}`}>▼</span>
-                  </div>
-                  
-                  {dropdownOpen && (
-                    <div className="filter-dropdown-backdrop open" onClick={() => setDropdownOpen(false)} />
-                  )}
-                  
-                  <div className={`filter-dropdown-menu ${dropdownOpen ? 'open' : ''}`}>
-                    <div className="filter-header">
-                      <div className="filter-header-top">
-                        <h3>Select Collections</h3>
-                        <button 
-                          className="filter-close-mobile"
-                          onClick={() => setDropdownOpen(false)}
-                          aria-label="Close"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                      <div className="filter-actions">
-                        <button 
-                          className="select-all-button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            selectAllCollections();
-                          }}
-                          disabled={collections.length === selectedCollections.length}
-                        >
-                          Select All
-                        </button>
-                        <button 
-                          className="deselect-all-button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deselectAllCollections();
-                          }}
-                          disabled={selectedCollections.length === 0}
-                        >
-                          Deselect All
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <div className="collections-filter">
-                      {collections.map(collection => (
-                        <div 
-                          key={collection} 
-                          className={`collection-item ${selectedCollections.includes(collection) ? 'selected' : ''}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleCollection(collection);
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            className="collection-item-checkbox"
-                            checked={selectedCollections.includes(collection)}
-                            onChange={() => {}} // Handled by the div onClick
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleCollection(collection);
-                            }}
-                          />
-                          <span className="collection-item-name">{collection}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  </span>
+                </div>
+              </div>
+            )}
+            
+            {/* Collections filter area */}
+            {collections.length > 0 && (
+              <div className="collections-filter">
+                <h3>Collections</h3>
+                <div className="filter-actions">
+                  <button onClick={selectAllCollections} className="select-all">Select All</button>
+                  <button onClick={deselectAllCollections} className="deselect-all">Deselect All</button>
+                  <button onClick={handleRefresh} className="refresh-button" disabled={loading || fetchingMore}>
+                    {loading ? 'Refreshing...' : 'Refresh'}
+                  </button>
                 </div>
                 
-                <button 
-                  className="refresh-button"
-                  onClick={handleRefresh}
-                  disabled={loading || selectedCollections.length === 0}
-                  title="Refresh only the feed, not the chart"
-                >
-                  Refresh Feed
-                </button>
-              </div>
-              
-              <div className="feed-filters">
-                <div className="toggle-container">
-                  <div className="timestamp-toggle">
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={useRkeyTimestamp}
-                        onChange={() => {
-                          // Toggle the timestamp mode
-                          const newTimestampMode = !useRkeyTimestamp;
-                          setUseRkeyTimestamp(newTimestampMode);
-                          
-                          // Refresh the feed with the new timestamp setting
-                          if (did && serviceEndpoint && selectedCollections.length > 0) {
-                            // Temporarily reset records for the loading state
-                            const currentRecords = [...records];
-                            setRecords([]);
-                            setLoading(true);
-                            
-                            // Use our refreshed server-side approach
-                            handleRefresh()
-                              .catch(err => {
-                                console.error("Error refreshing with new timestamp mode:", err);
-                                
-                                // Restore the previous records and sort them
-                                const sorted = [...currentRecords].filter(record => {
-                                  if (newTimestampMode) { // We're switching to rkey timestamps
-                                    return record.rkeyTimestamp !== null;
-                                  } else { // We're switching to content timestamps
-                                    return record.contentTimestamp !== null;
-                                  }
-                                }).sort((a, b) => {
-                                  const aTime = newTimestampMode ? a.rkeyTimestamp : a.contentTimestamp;
-                                  const bTime = newTimestampMode ? b.rkeyTimestamp : b.contentTimestamp;
-                                  return new Date(bTime) - new Date(aTime);
-                                });
-                                setRecords(sorted);
-                                setLoading(false);
-                              });
-                          } else {
-                            // If we can't refetch, just resort the existing records
-                            const sorted = [...records].filter(record => {
-                              if (newTimestampMode) { // We're switching to rkey timestamps
-                                return record.rkeyTimestamp !== null;
-                              } else { // We're switching to content timestamps
-                                return record.contentTimestamp !== null;
-                              }
-                            }).sort((a, b) => {
-                              const aTime = newTimestampMode ? a.rkeyTimestamp : a.contentTimestamp;
-                              const bTime = newTimestampMode ? b.rkeyTimestamp : b.contentTimestamp;
-                              return new Date(bTime) - new Date(aTime);
-                            });
-                            setRecords(sorted);
-                          }
-                        }}
-                      />
-                      Use Record Key Timestamps
-                    </label>
-                    <span title="Record keys in AT Protocol encode creation timestamps which can differ from timestamps in the record content.">ⓘ</span>
-                  </div>
-                  
-                  <div className="view-toggle">
-                    <div className="toggle-switch-container">
-                      <label className="switch">
+                <div className="collections-list">
+                  {collections.map(collection => (
+                    <div key={collection} className="collection-item">
+                      <label>
                         <input
                           type="checkbox"
-                          checked={compactView}
-                          onChange={() => setCompactView(!compactView)}
+                          checked={selectedCollections.includes(collection)}
+                          onChange={() => toggleCollection(collection)}
                         />
-                        <span className="slider round"></span>
-                        <span className="toggle-label">{compactView ? 'Compact View' : 'Standard View'}</span>
+                        {collection}
                       </label>
                     </div>
-                  </div>
+                  ))}
                 </div>
               </div>
-              
-              {selectedCollections.length === 0 ? (
-                <div className="no-collections-message">
-                  <p>Please select at least one collection to view records.</p>
-                </div>
-              ) : (
-                <>
-                  <FeedTimeline 
-                    records={filteredRecords} 
-                    serviceEndpoint={serviceEndpoint}
-                    compactView={compactView}
-                  />
-                  
-                  {filteredRecords.length === 0 && (
-                    <div className="no-records-message">
-                      <p>No records found for the selected collections.</p>
-                    </div>
-                  )}
-                  
-                  {filteredRecords.length > 0 && (
-                    <div className="load-more-container">
-                      <div className="records-count">
-                        Showing {filteredRecords.length} of {filteredChartRecords.length} records
-                      </div>
-                      
-                      {canLoadMore && (
-                        <button 
-                          className="load-more-button"
-                          onClick={handleLoadMore}
-                          disabled={fetchingMore}
-                        >
-                          {fetchingMore ? 'Loading...' : 'Load More Records'}
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-        </>
-      )}
+            )}
+            
+            {/* Loading indicator for chart update */}
+            {chartLoading && (
+              <div className="chart-loading">
+                <div className="spinner"></div>
+                <p>Loading historical data for visualization...</p>
+              </div>
+            )}
+            
+            {/* Activity Chart */}
+            {!chartLoading && filteredChartRecords.length > 0 && (
+              <div className="chart-container">
+                <h3>Activity Timeline</h3>
+                <ActivityChart 
+                  records={filteredChartRecords} 
+                  useRkeyTimestamp={useRkeyTimestamp}
+                />
+              </div>
+            )}
+            
+            {/* Feed heading */}
+            {selectedCollections.length > 0 && (
+              <>
+                <h3 className="feed-heading">Record Feed</h3>
+                {filteredRecords.length === 0 && !loading && (
+                  <p className="no-records-message">No records found for the selected collections.</p>
+                )}
+              </>
+            )}
+            
+            {/* Feed records */}
+            {selectedCollections.length === 0 ? (
+              <p className="no-collections-selected">Select at least one collection to see records.</p>
+            ) : (
+              <>
+                <FeedTimeline 
+                  records={filteredRecords} 
+                  useRkeyTimestamp={useRkeyTimestamp}
+                  loading={loading}
+                />
+                
+                {/* Load more button */}
+                {filteredRecords.length > 0 && (hasMoreRecordsLocally || hasMoreRecordsRemotely) && (
+                  <div className="load-more-container">
+                    <button 
+                      onClick={handleLoadMore} 
+                      disabled={fetchingMore}
+                      className="load-more-button"
+                    >
+                      {fetchingMore ? 'Loading...' : 'Load More'}
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

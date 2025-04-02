@@ -1,27 +1,59 @@
 import React, { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import Loading from '../Loading/Loading';
 
 // This component handles the callback redirect from the Bluesky OAuth process
 const LoginCallback = () => {
-  const { loading } = useAuth();
+  const { loading, checkAuthStatus } = useAuth();
   const [error, setError] = useState(null);
+  const [returnUrl, setReturnUrl] = useState('/');
+  const location = useLocation();
 
   useEffect(() => {
-    // The actual callback handling is done in the AuthContext.js
-    // through the client.init() method that automatically processes 
-    // the URL params when the page loads
-    
-    // We just check if there are any errors in the URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const errorParam = urlParams.get('error');
-    const errorDescription = urlParams.get('error_description');
-    
-    if (errorParam) {
-      setError(errorDescription || errorParam);
-    }
-  }, []);
+    const handleCallback = async () => {
+      try {
+        // Get return URL from session storage or state parameter
+        const sessionReturnUrl = sessionStorage.getItem('returnUrl');
+        const params = new URLSearchParams(location.search);
+        const stateParam = params.get('state');
+        
+        // If state contains encoded returnUrl, extract it
+        let decodedState = null;
+        if (stateParam) {
+          try {
+            decodedState = JSON.parse(atob(stateParam));
+            if (decodedState && decodedState.returnUrl) {
+              setReturnUrl(decodedState.returnUrl);
+            }
+          } catch (e) {
+            console.error('Failed to decode state parameter:', e);
+          }
+        }
+        
+        // Prioritize returnUrl from session storage if available
+        if (sessionReturnUrl) {
+          setReturnUrl(sessionReturnUrl);
+          sessionStorage.removeItem('returnUrl');
+        }
+        
+        // Check for error in URL parameters
+        const errorParam = params.get('error');
+        if (errorParam) {
+          setError(errorParam);
+          return;
+        }
+
+        // Check server-side authentication status
+        await checkAuthStatus();
+      } catch (err) {
+        console.error('Error handling login callback:', err);
+        setError('Failed to complete login process');
+      }
+    };
+
+    handleCallback();
+  }, [location, checkAuthStatus]);
 
   if (loading) {
     return <Loading message="Processing login..." />;
@@ -39,8 +71,8 @@ const LoginCallback = () => {
     );
   }
 
-  // Redirect to the home page if no errors
-  return <Navigate to="/" replace />;
+  // Redirect to the return URL (or home by default)
+  return <Navigate to={returnUrl} replace />;
 };
 
 export default LoginCallback; 

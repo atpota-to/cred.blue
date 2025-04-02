@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import './Login.css';
 
@@ -7,15 +7,27 @@ const Login = () => {
   const [handle, setHandle] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [returnUrl, setReturnUrl] = useState('');
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Extract returnUrl from query params
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const returnPath = searchParams.get('returnUrl');
+    if (returnPath) {
+      setReturnUrl(returnPath);
+    }
+  }, [location]);
 
   // Redirect if already authenticated
-  React.useEffect(() => {
+  useEffect(() => {
     if (isAuthenticated) {
-      navigate('/');
+      // Navigate to return URL if it exists, otherwise to home
+      navigate(returnUrl || '/');
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, returnUrl]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -29,7 +41,8 @@ const Login = () => {
     setError('');
     
     try {
-      await login(handle);
+      // Pass returnUrl to login function
+      await login(handle, returnUrl);
       // Note: This code won't run because login redirects to Bluesky OAuth page
     } catch (err) {
       setError('Authentication failed. Please try again.');
@@ -42,6 +55,12 @@ const Login = () => {
       <div className="login-card">
         <h2>Login with Bluesky</h2>
         <p>Sign in with your Bluesky handle to access protected features.</p>
+        
+        {returnUrl && (
+          <div className="return-notice">
+            <p>You'll be redirected back to the page you were trying to access after logging in.</p>
+          </div>
+        )}
         
         {error && <div className="login-error">{error}</div>}
         

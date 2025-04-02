@@ -69,13 +69,22 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // Initiate the login process
-  const login = async (handle) => {
+  const login = async (handle, returnUrl) => {
     if (!client) return;
     
     try {
-      // The signIn method will redirect the user to the OAuth server
-      await client.signIn(handle);
-      // This code won't execute as the page will be redirected
+      // Save returnUrl to session storage if provided
+      if (returnUrl) {
+        sessionStorage.setItem('returnUrl', returnUrl);
+      }
+      
+      // Create state parameter with returnUrl
+      const state = returnUrl ? 
+        btoa(JSON.stringify({ returnUrl })) : 
+        undefined;
+      
+      // Pass state parameter to signIn method
+      await client.signIn(handle, { state });
     } catch (err) {
       console.error('Login failed:', err);
       setError(err.message);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import SearchBar from '../SearchBar/SearchBar';
 import FeedTimeline from './FeedTimeline';
@@ -7,10 +7,12 @@ import './CollectionsFeed.css'; // Renamed to Omnifeed.css but keeping same file
 import { resolveHandleToDid, getServiceEndpointForDid } from '../../accountData';
 import MatterLoadingAnimation from '../MatterLoadingAnimation';
 import { Helmet } from 'react-helmet';
+import { useAuth } from '../../contexts/AuthContext';
 
 const CollectionsFeed = () => {
   const { username } = useParams();
   const navigate = useNavigate();
+  const { isAuthenticated, checkAuthStatus } = useAuth();
   
   // State variables
   const [handle, setHandle] = useState(username || '');
@@ -31,101 +33,9 @@ const CollectionsFeed = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [useRkeyTimestamp, setUseRkeyTimestamp] = useState(false);
   const [compactView, setCompactView] = useState(false);
+  const [displayCount, setDisplayCount] = useState(25);
   
-  // Effect to load data if username is provided in URL
-  useEffect(() => {
-    if (username) {
-      loadUserData(username);
-    }
-  }, [username]);
-  
-  // Effect to watch for selected collections changes
-  useEffect(() => {
-    // Only trigger a data fetch when filters change if we haven't fetched enough data previously
-    if (selectedCollections.length > 0 && did && serviceEndpoint && searchPerformed) {
-      const hasUnfetchedCollections = selectedCollections.some(col => 
-        !allRecordsForChart.some(record => record.collection === col)
-      );
-      
-      if (hasUnfetchedCollections) {
-        // Only fetch collections we haven't fetched before
-        const collectionsToFetch = selectedCollections.filter(col => 
-          !allRecordsForChart.some(record => record.collection === col)
-        );
-        
-        if (collectionsToFetch.length > 0) {
-          console.log(`Fetching data for new collections: ${collectionsToFetch.join(', ')}`);
-          fetchCollectionRecords(did, serviceEndpoint, collectionsToFetch);
-        }
-      } else {
-        console.log('All collections already fetched, just filtering existing data');
-      }
-    }
-  }, [selectedCollections]);
-  
-  // Function to load user data
-  const loadUserData = async (userHandle) => {
-    try {
-      setLoading(true);
-      setError('');
-      
-      // Update URL with the username
-      if (userHandle !== username) {
-        navigate(`/omnifeed/${encodeURIComponent(userHandle)}`);
-      }
-      
-      // Resolve handle to DID
-      const userDid = await resolveHandleToDid(userHandle);
-      setDid(userDid);
-      
-      // Get service endpoint
-      const endpoint = await getServiceEndpointForDid(userDid);
-      setServiceEndpoint(endpoint);
-      
-      // Fetch profile information
-      const publicApiEndpoint = "https://public.api.bsky.app";
-      const profileResponse = await fetch(`${publicApiEndpoint}/xrpc/app.bsky.actor.getProfile?actor=${encodeURIComponent(userDid)}`);
-      
-      if (!profileResponse.ok) {
-        throw new Error(`Error fetching profile: ${profileResponse.statusText}`);
-      }
-      
-      const profileData = await profileResponse.json();
-      setHandle(profileData.handle);
-      setDisplayName(profileData.displayName || profileData.handle);
-      
-      // Fetch repo description to get collections
-      const repoResponse = await fetch(`${endpoint}/xrpc/com.atproto.repo.describeRepo?repo=${encodeURIComponent(userDid)}`);
-      
-      if (!repoResponse.ok) {
-        throw new Error(`Error fetching repo description: ${repoResponse.statusText}`);
-      }
-      
-      const repoData = await repoResponse.json();
-      if (repoData.collections && repoData.collections.length > 0) {
-        const sortedCollections = [...repoData.collections].sort();
-        setCollections(sortedCollections);
-        // By default, select all collections
-        setSelectedCollections(sortedCollections);
-        
-        // Fetch records for each collection
-        await fetchCollectionRecords(userDid, endpoint, sortedCollections);
-      } else {
-        setError('No collections found for this user.');
-      }
-      
-      setSearchPerformed(true);
-      setInitialLoad(false);
-      setLoading(false);
-    } catch (err) {
-      console.error('Error loading user data:', err);
-      setError(err.message || 'An error occurred while loading data.');
-      setInitialLoad(false);
-      setLoading(false);
-    }
-  };
-  
-  // Helper function to decode TID (rkey) to timestamp
+  // Helper functions
   const tidToTimestamp = (tid) => {
     try {
       // TIDs use a custom base32 encoding
@@ -154,7 +64,6 @@ const CollectionsFeed = () => {
     }
   };
   
-  // Helper function to extract timestamp from record
   const extractTimestamp = (record) => {
     // First check if createdAt exists directly in the value
     if (record.value?.createdAt) {
@@ -192,18 +101,17 @@ const CollectionsFeed = () => {
     return findTimestamp(record);
   };
   
-  // Function to fetch records from collections
-  const fetchCollectionRecords = async (userDid, endpoint, collectionsList, isLoadMore = false) => {
+  // Define fetchCollectionRecords with useCallback first
+  const fetchCollectionRecords = useCallback(async (userDid, endpoint, collectionsList, isLoadMore = false) => {
     try {
       setFetchingMore(isLoadMore);
       
       // Set chartLoading for initial load or when refreshing
       if (!isLoadMore || collectionsList.length > 0) {
         setChartLoading(true);
-        console.log(`Setting chart loading to TRUE for ${isLoadMore ? 'refresh' : 'initial load'}`);
       }
       
-      // Array to store all fetched records
+      // Arrays to store all fetched records
       let allRecords = isLoadMore ? [...records] : [];
       let allChartRecords = isLoadMore ? [...allRecordsForChart] : [];
       const newCursors = { ...collectionCursors };
@@ -222,7 +130,6 @@ const CollectionsFeed = () => {
         let pageCount = 0;
         let collectionRecords = [];
         let reachedCutoff = false;
-        let totalRecordsForCollection = 0;
         
         // For initial deep load, we need to paginate as many times as needed to get all historical data
         // For regular timeline browsing or load more, we just get one page
@@ -230,19 +137,24 @@ const CollectionsFeed = () => {
         const maxPages = isInitialDeepLoad ? 1000 : 1; 
         
         while (hasMoreRecords && pageCount < maxPages && !reachedCutoff) {
-          // Fetch up to 100 records per page
-          let url = `${endpoint}/xrpc/com.atproto.repo.listRecords?repo=${encodeURIComponent(userDid)}&collection=${encodeURIComponent(collection)}&limit=100`;
+          // Use our server-side API to fetch records
+          let url = `/api/collections/${encodeURIComponent(userDid)}/records?endpoint=${encodeURIComponent(endpoint)}&collection=${encodeURIComponent(collection)}&limit=100`;
           
           // Add cursor if we have one
           if (cursor) {
             url += `&cursor=${encodeURIComponent(cursor)}`;
           }
           
-          console.log(`Fetching ${collection} page ${pageCount + 1}${cursor ? ' with cursor' : ''}`);
-          
-          const response = await fetch(url);
+          const response = await fetch(url, {
+            credentials: 'include'
+          });
           
           if (!response.ok) {
+            if (response.status === 401) {
+              // Handle unauthorized
+              checkAuthStatus();
+              throw new Error('Authentication required. Please log in again.');
+            }
             console.error(`Error fetching records for ${collection}: ${response.statusText}`);
             break;
           }
@@ -252,9 +164,6 @@ const CollectionsFeed = () => {
           
           // Process records from this page
           if (data.records && data.records.length > 0) {
-            console.log(`Received ${data.records.length} records for ${collection} page ${pageCount}`);
-            totalRecordsForCollection += data.records.length;
-            
             const processedRecords = data.records.map(record => {
               const contentTimestamp = extractTimestamp(record);
               const rkey = record.uri.split('/').pop();
@@ -307,12 +216,6 @@ const CollectionsFeed = () => {
                 // All records on this page are within our date range 
                 // OR we need to keep paginating through high-volume collections
                 collectionRecords.push(...processedRecords);
-                
-                // If we found some records close to the cutoff date but haven't reached it yet,
-                // log this for debugging purposes
-                if (oldestRecordTime < cutoffDate.getTime() + (7 * 24 * 60 * 60 * 1000)) { // within 7 days of cutoff
-                  console.log(`  - Getting close to cutoff date, oldest record = ${new Date(oldestRecordTime).toISOString()}`);
-                }
               }
             } else {
               // For regular browsing, include all records from the page
@@ -341,25 +244,12 @@ const CollectionsFeed = () => {
           delete newCursors[collection];
         }
         
-        console.log(`Finished fetching ${collection}: Retrieved ${totalRecordsForCollection} records in ${pageCount} pages`);
-        console.log(`  - After filtering: ${collectionRecords.length} records in 90-day window`);
-        if (reachedCutoff) {
-          console.log(`  - Stopped because records older than 90 days were found`);
-        } else if (!cursor) {
-          console.log(`  - Stopped because no more records were available`);
-        } else if (pageCount >= maxPages) {
-          console.log(`  - Stopped because max page limit (${maxPages}) was reached`);
-        }
-        
         // Add records to appropriate arrays
         allChartRecords = [...allChartRecords, ...collectionRecords];
         
         // For display timeline, we might want to be more selective
         if (isLoadMore || !isInitialDeepLoad) {
           allRecords = [...allRecords, ...collectionRecords];
-        } else if (isInitialDeepLoad) {
-          // For initial load, we'll filter later to just show the most recent
-          // This keeps allRecords separate from chart data until we're done
         }
       }
       
@@ -391,24 +281,6 @@ const CollectionsFeed = () => {
         displayRecords = filterAndSort(allRecords);
       }
       
-      // Create a summary of records per collection for debugging
-      const collectionSummary = {};
-      sortedChartRecords.forEach(record => {
-        if (!collectionSummary[record.collection]) {
-          collectionSummary[record.collection] = 0;
-        }
-        collectionSummary[record.collection]++;
-      });
-      
-      console.log("Collection record counts in 90-day period:");
-      Object.entries(collectionSummary)
-        .sort((a, b) => b[1] - a[1]) // Sort by count descending
-        .forEach(([collection, count]) => {
-          console.log(`  - ${collection}: ${count} records`);
-        });
-      
-      console.log(`Fetched ${sortedChartRecords.length} total records for chart, showing ${displayRecords.length} in timeline`);
-      
       // In the case of a refresh, sortedChartRecords only contains fresh data for selected collections
       // We need to merge this with any existing data for other collections
       const existingRecordsToKeep = isLoadMore ? [] : allRecordsForChart.filter(record => 
@@ -420,11 +292,6 @@ const CollectionsFeed = () => {
       
       // For refresh, remove old data for the collections we just refreshed
       if (!isLoadMore) {
-        console.log(`Removing old data for refreshed collections: ${collectionsList.join(', ')}`);
-        
-        // Count for stats
-        const beforeCount = existingRecordsToKeep.length + sortedChartRecords.length;
-        
         // Remove duplicates that might exist in both arrays
         // This can happen if we refreshed a collection we already had data for
         const uniqueNewRecords = sortedChartRecords.filter(newRecord => {
@@ -436,15 +303,11 @@ const CollectionsFeed = () => {
         
         // Merge fresh data with existing data for other collections
         mergedRecords = [...existingRecordsToKeep, ...uniqueNewRecords];
-        console.log(`Merged ${existingRecordsToKeep.length} existing records with ${uniqueNewRecords.length} new unique records`);
-        console.log(`Total records: ${beforeCount} before deduplication, ${mergedRecords.length} after`);
       }
       else {
         // For load more, just add all the new records
         mergedRecords = [...existingRecordsToKeep, ...sortedChartRecords];
       }
-      
-      console.log(`Final chart dataset size: ${mergedRecords.length} records`);
       
       // Update state
       setRecords(displayRecords);
@@ -454,16 +317,143 @@ const CollectionsFeed = () => {
       
       // Always set chartLoading to false when done, regardless of initial state
       setChartLoading(false);
-      console.log("Setting chart loading to FALSE");
       
     } catch (err) {
       console.error('Error fetching collection records:', err);
       setError('Failed to fetch records. Please try again.');
       setFetchingMore(false);
       setChartLoading(false); // Always reset on error
-      console.log("Setting chart loading to FALSE (error case)");
+      throw err; // Re-throw to allow handling in calling functions
     }
-  };
+  }, [records, allRecordsForChart, collectionCursors, useRkeyTimestamp, checkAuthStatus]);
+  
+  // Now define loadUserData after fetchCollectionRecords is defined
+  const loadUserData = useCallback(async (userHandle) => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      // Update URL with the username
+      if (userHandle !== username) {
+        navigate(`/omnifeed/${encodeURIComponent(userHandle)}`);
+      }
+      
+      // Resolve handle to DID
+      const userDid = await resolveHandleToDid(userHandle);
+      setDid(userDid);
+      
+      // Get service endpoint
+      const endpoint = await getServiceEndpointForDid(userDid);
+      setServiceEndpoint(endpoint);
+      
+      // Fetch profile information
+      const publicApiEndpoint = "https://public.api.bsky.app";
+      const profileResponse = await fetch(`${publicApiEndpoint}/xrpc/app.bsky.actor.getProfile?actor=${encodeURIComponent(userDid)}`);
+      
+      if (!profileResponse.ok) {
+        throw new Error(`Error fetching profile: ${profileResponse.statusText}`);
+      }
+      
+      const profileData = await profileResponse.json();
+      setHandle(profileData.handle);
+      setDisplayName(profileData.displayName || profileData.handle);
+      
+      // Use our server-side API to fetch collections
+      const collectionsResponse = await fetch(`/api/collections/${encodeURIComponent(userDid)}?endpoint=${encodeURIComponent(endpoint)}`, {
+        credentials: 'include'
+      });
+      
+      if (!collectionsResponse.ok) {
+        if (collectionsResponse.status === 401) {
+          // Handle unauthorized
+          checkAuthStatus();
+          throw new Error('Authentication required. Please log in again.');
+        }
+        throw new Error(`Error fetching collections: ${collectionsResponse.statusText}`);
+      }
+      
+      const collectionsData = await collectionsResponse.json();
+      
+      if (collectionsData.collections && collectionsData.collections.length > 0) {
+        const sortedCollections = [...collectionsData.collections].sort();
+        setCollections(sortedCollections);
+        // By default, select all collections
+        setSelectedCollections(sortedCollections);
+        
+        // Fetch records for each collection
+        await fetchCollectionRecords(userDid, endpoint, sortedCollections);
+      } else {
+        setError('No collections found for this user.');
+      }
+      
+      setSearchPerformed(true);
+      setInitialLoad(false);
+      setLoading(false);
+    } catch (err) {
+      console.error('Error loading user data:', err);
+      setError(err.message || 'An error occurred while loading data.');
+      setInitialLoad(false);
+      setLoading(false);
+    }
+  }, [username, navigate, checkAuthStatus, fetchCollectionRecords]);
+  
+  // Now place useEffects after all the callbacks are defined
+  
+  // Verify authentication first
+  useEffect(() => {
+    const verifyAuth = async () => {
+      try {
+        await checkAuthStatus();
+        if (!isAuthenticated) {
+          // Save the current path for redirect after login
+          const returnUrl = encodeURIComponent(window.location.pathname);
+          navigate(`/login?returnUrl=${returnUrl}`);
+        }
+      } catch (err) {
+        console.error('Auth verification failed:', err);
+        navigate('/login');
+      }
+    };
+    
+    verifyAuth();
+    
+    // Set up periodic auth checks
+    const interval = setInterval(checkAuthStatus, 30000); // Check every 30 seconds
+    
+    return () => clearInterval(interval);
+  }, [isAuthenticated, checkAuthStatus, navigate]);
+  
+  // Effect to load data if username is provided in URL
+  useEffect(() => {
+    // Only load data if authenticated and username is available
+    if (username && isAuthenticated) {
+      loadUserData(username);
+    }
+  }, [username, isAuthenticated, loadUserData]);
+  
+  // Effect to watch for selected collections changes
+  useEffect(() => {
+    // Only trigger a data fetch when filters change if we haven't fetched enough data previously
+    if (selectedCollections.length > 0 && did && serviceEndpoint && searchPerformed) {
+      const hasUnfetchedCollections = selectedCollections.some(col => 
+        !allRecordsForChart.some(record => record.collection === col)
+      );
+      
+      if (hasUnfetchedCollections) {
+        // Only fetch collections we haven't fetched before
+        const collectionsToFetch = selectedCollections.filter(col => 
+          !allRecordsForChart.some(record => record.collection === col)
+        );
+        
+        if (collectionsToFetch.length > 0) {
+          console.log(`Fetching data for new collections: ${collectionsToFetch.join(', ')}`);
+          fetchCollectionRecords(did, serviceEndpoint, collectionsToFetch);
+        }
+      } else {
+        console.log('All collections already fetched, just filtering existing data');
+      }
+    }
+  }, [selectedCollections, did, serviceEndpoint, searchPerformed, allRecordsForChart, fetchCollectionRecords]);
   
   // Toggle collection selection
   const toggleCollection = (collection) => {
@@ -498,8 +488,6 @@ const CollectionsFeed = () => {
   // Handle refresh button click - only updates the feed, not the chart
   const handleRefresh = async () => {
     if (did && serviceEndpoint) {
-      console.log("Refresh requested for selected collections:", selectedCollections);
-      
       // Set a loading state but not for the chart
       setLoading(true);
       
@@ -514,12 +502,19 @@ const CollectionsFeed = () => {
           // Process each selected collection sequentially
           for (const collection of selectedCollections) {
             try {
-              // Fetch just one page of the most recent records
-              const url = `${serviceEndpoint}/xrpc/com.atproto.repo.listRecords?repo=${encodeURIComponent(did)}&collection=${encodeURIComponent(collection)}&limit=25`;
+              // Use server-side API endpoint for fetching records
+              const url = `/api/collections/${encodeURIComponent(did)}/records?endpoint=${encodeURIComponent(serviceEndpoint)}&collection=${encodeURIComponent(collection)}&limit=25`;
               
-              const response = await fetch(url);
+              const response = await fetch(url, {
+                credentials: 'include'
+              });
               
               if (!response.ok) {
+                if (response.status === 401) {
+                  // Handle unauthorized
+                  checkAuthStatus();
+                  throw new Error('Authentication required. Please log in again.');
+                }
                 console.error(`Error refreshing ${collection}: ${response.statusText}`);
                 continue; // Skip this collection but continue with others
               }
@@ -527,8 +522,6 @@ const CollectionsFeed = () => {
               const data = await response.json();
               
               if (data.records && data.records.length > 0) {
-                console.log(`Refreshed ${data.records.length} records for ${collection}`);
-                
                 // Process the records with timestamps
                 const processedRecords = data.records.map(record => {
                   const contentTimestamp = extractTimestamp(record);
@@ -569,11 +562,9 @@ const CollectionsFeed = () => {
           
           // Only update the feed display records, not the chart data
           setRecords(sortedRecords.slice(0, 25));
-          console.log(`Feed refreshed with ${sortedRecords.length} records`);
         };
         
         await refreshOnlyFeed();
-        console.log("Feed refresh completed successfully");
       } catch (err) {
         console.error("Error during feed refresh:", err);
         setError('Failed to refresh records. Please try again.');
@@ -586,33 +577,45 @@ const CollectionsFeed = () => {
   
   // Handle load more button click
   const handleLoadMore = async () => {
+    // Verify authentication before proceeding
+    if (!isAuthenticated) {
+      checkAuthStatus();
+      return;
+    }
+
     setFetchingMore(true);
     
     // First check if we already have more records locally that we can show
     if (hasMoreRecordsLocally) {
-      console.log("Loading more records from local cache");
       // Simply increase the display count by 25 more records
       const nextBatchSize = 25;
       setDisplayCount(prevCount => prevCount + nextBatchSize);
-      console.log(`Increasing display count to ${displayCount + nextBatchSize}`);
       
       setFetchingMore(false);
     } 
     // If we've displayed all local records but have cursors to fetch more from the API
     else if (hasMoreRecordsRemotely) {
-      console.log("Fetching more records from API");
       // Only load more from collections that have cursors and are selected
       const collectionsToLoad = selectedCollections.filter(collection => collectionCursors[collection]);
       
       if (collectionsToLoad.length > 0) {
-        await fetchCollectionRecords(did, serviceEndpoint, collectionsToLoad, true);
-        // After fetching more, we can increase the display count to show them
-        setDisplayCount(prevCount => prevCount + 25);
+        try {
+          await fetchCollectionRecords(did, serviceEndpoint, collectionsToLoad, true);
+          // After fetching more, we can increase the display count to show them
+          setDisplayCount(prevCount => prevCount + 25);
+        } catch (error) {
+          if (error.message?.includes('Authentication required')) {
+            // Handle authentication errors
+            const returnUrl = encodeURIComponent(window.location.pathname);
+            navigate(`/login?returnUrl=${returnUrl}`);
+          } else {
+            setError('Failed to load more records. Please try again.');
+          }
+        }
       } else {
         setFetchingMore(false);
       }
     } else {
-      console.log("No more records to load");
       setFetchingMore(false);
     }
   };
@@ -622,9 +625,6 @@ const CollectionsFeed = () => {
     selectedCollections.includes(record.collection)
   );
 
-  // State to track how many records to display
-  const [displayCount, setDisplayCount] = useState(25);
-  
   // For timeline display, directly use the chart records but limit to the current displayCount
   // This ensures we always show the most recent records for the selected collections
   const filteredRecords = filteredChartRecords
@@ -866,19 +866,16 @@ const CollectionsFeed = () => {
                           
                           // Refresh the feed with the new timestamp setting
                           if (did && serviceEndpoint && selectedCollections.length > 0) {
-                            // We need to refetch to ensure we get all records
-                            // Store the current mode for fetchCollectionRecords
-                            const currentMode = useRkeyTimestamp;
-                            
                             // Temporarily reset records for the loading state
                             const currentRecords = [...records];
                             setRecords([]);
                             setLoading(true);
                             
-                            // Fetch new records with the current selection
-                            fetchCollectionRecords(did, serviceEndpoint, selectedCollections)
+                            // Use our refreshed server-side approach
+                            handleRefresh()
                               .catch(err => {
                                 console.error("Error refreshing with new timestamp mode:", err);
+                                
                                 // Restore the previous records and sort them
                                 const sorted = [...currentRecords].filter(record => {
                                   if (newTimestampMode) { // We're switching to rkey timestamps

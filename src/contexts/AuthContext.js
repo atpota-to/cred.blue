@@ -4,31 +4,19 @@ import { BrowserOAuthClient } from '@atproto/oauth-client-browser';
 // Create auth context
 export const AuthContext = createContext(null);
 
-// Determine environment
-const isDevelopment = process.env.NODE_ENV === 'development';
-const hostname = window.location.hostname;
-
 // Set the appropriate domain based on the current hostname
-let domain;
-if (isDevelopment) {
-  domain = 'http://localhost:3000';
-} else if (hostname === 'testing.cred.blue') {
-  domain = 'https://testing.cred.blue';
-} else {
-  domain = 'https://cred.blue';
-}
+let domain = 'https://testing.cred.blue';
 
-// Use the production client metadata URL for all environments
-// This ensures we don't need separate metadata files
-const metadataUrl = 'https://cred.blue/client-metadata.json';
+// Always use the current domain for client_id to ensure it matches the host
+const metadataUrl = `https://testing.cred.blue/client-metadata.json`;
 
 // Client metadata for Bluesky OAuth
 const clientMetadata = {
   client_id: metadataUrl,
   client_name: "Cred.blue",
   client_uri: domain,
-  redirect_uris: [`${domain}/login/callback`],
-  logo_uri: `${domain}/favicon.ico`,
+  redirect_uris: [`https://testing.cred.blue/login/callback`],
+  logo_uri: `https://testing.cred.blue/favicon.ico`,
   scope: "atproto",
   grant_types: ["authorization_code", "refresh_token"],
   response_types: ["code"],
@@ -47,9 +35,9 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        // Create the OAuth client
+        // Create the OAuth client with inline metadata
         const oauthClient = new BrowserOAuthClient({
-          clientMetadata,
+          clientMetadata, // Pass the inline metadata directly
           handleResolver: 'https://bsky.social', // Using bsky.social as handle resolver
         });
 

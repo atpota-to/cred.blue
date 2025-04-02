@@ -35,11 +35,12 @@ const ActivityChart = ({ records, collections, loading = false }) => {
   const atprotoBorderColor = 'rgba(0, 51, 102, 1)';
   
   useEffect(() => {
-    // Only generate chart data if we have records
-    if (records && records.length > 0) {
+    // Only generate chart data if we have records and we're not loading
+    if (records && records.length > 0 && !loading) {
+      console.log(`Generating chart data for ${records.length} records with period ${timePeriod}`);
       generateChartData(records, timePeriod);
     }
-  }, [records, timePeriod]);
+  }, [records, timePeriod, loading]);
   
   // Function to generate data for the chart based on selected time period
   const generateChartData = (allRecords, period) => {
@@ -315,6 +316,7 @@ const ActivityChart = ({ records, collections, loading = false }) => {
   
   // Show loading state when fetching records deeply
   if (loading) {
+    console.log("ActivityChart rendering loading state");
     return (
       <div className="activity-chart-container">
         <div className="activity-chart-loading">
@@ -324,6 +326,8 @@ const ActivityChart = ({ records, collections, loading = false }) => {
         </div>
       </div>
     );
+  } else {
+    console.log(`ActivityChart not in loading state, has ${records?.length || 0} records`);
   }
   
   // Ensure records array exists and has items

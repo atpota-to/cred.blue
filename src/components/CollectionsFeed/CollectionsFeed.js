@@ -136,7 +136,7 @@ const CollectionsFeed = () => {
       return null;
     }
   };
-
+  
   // Helper function to extract timestamp from record
   const extractTimestamp = (record) => {
     // First check if createdAt exists directly in the value
@@ -174,11 +174,17 @@ const CollectionsFeed = () => {
     // Try to find a timestamp in the record
     return findTimestamp(record);
   };
-
+  
   // Function to fetch records from collections
   const fetchCollectionRecords = async (userDid, endpoint, collectionsList, isLoadMore = false) => {
     try {
       setFetchingMore(isLoadMore);
+      
+      // If this is an initial load for chart data, set chartLoading
+      if (!isLoadMore) {
+        setChartLoading(true);
+        console.log("Setting chart loading to TRUE");
+      }
       
       // Array to store all fetched records
       let allRecords = isLoadMore ? [...records] : [];
@@ -189,15 +195,10 @@ const CollectionsFeed = () => {
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - 90); // 3 months
       
-      // Track if this is the initial load for charting purposes
-      const isInitialLoad = !isLoadMore && allRecordsForChart.length === 0;
+      // Flag to track if we're doing a deep initial load for chart data
+      const isInitialDeepLoad = !isLoadMore && allRecordsForChart.length === 0;
       
-      // Set chart loading state if we're doing deep pagination for the chart
-      if (isInitialLoad) {
-        setChartLoading(true);
-      }
-      
-      // Fetch records for each collection
+      // Sequential processing for each collection to avoid overloading the API
       for (const collection of collectionsList) {
         let hasMoreRecords = true;
         let cursor = isLoadMore ? newCursors[collection] : null;
@@ -205,9 +206,9 @@ const CollectionsFeed = () => {
         let collectionRecords = [];
         let reachedCutoff = false;
         
-        // For initial load, we need to do deep pagination to get all data for charting
-        // For load more, we just get the next page
-        const maxPages = isInitialLoad ? 50 : 1; // Limit for safety
+        // For initial deep load, we paginate more to get historical data
+        // For regular timeline browsing or load more, we just get one page
+        const maxPages = isInitialDeepLoad ? 20 : 1; 
         
         while (hasMoreRecords && pageCount < maxPages && !reachedCutoff) {
           // Fetch up to 100 records per page
@@ -247,9 +248,8 @@ const CollectionsFeed = () => {
               };
             });
             
-            // Check if we've reached older records
-            if (isInitialLoad) {
-              // For chart data, determine if any records are beyond our cutoff
+            // For deep load, check if we've reached records beyond our cutoff
+            if (isInitialDeepLoad) {
               const oldestRecordTime = processedRecords.reduce((oldest, record) => {
                 const timestamp = record.contentTimestamp || record.rkeyTimestamp;
                 if (!timestamp) return oldest;
@@ -258,7 +258,7 @@ const CollectionsFeed = () => {
                 return recordTime < oldest ? recordTime : oldest;
               }, Date.now());
               
-              // If the oldest record on this page is older than our cutoff, we can stop
+              // If the oldest record on this page is older than our cutoff, we'll stop
               if (oldestRecordTime < cutoffDate.getTime()) {
                 reachedCutoff = true;
                 console.log(`Reached cutoff date for ${collection} on page ${pageCount}`);
@@ -276,7 +276,7 @@ const CollectionsFeed = () => {
                 collectionRecords.push(...processedRecords);
               }
             } else {
-              // For regular timeline browsing, just add all records
+              // For regular browsing, include all records from the page
               collectionRecords.push(...processedRecords);
             }
           }
@@ -288,8 +288,8 @@ const CollectionsFeed = () => {
             hasMoreRecords = false;
           }
           
-          // If we're not doing initial load for chart, break after first page
-          if (!isInitialLoad) {
+          // If we're not doing deep historical loading, stop after first page
+          if (!isInitialDeepLoad) {
             break;
           }
         }
@@ -302,44 +302,47 @@ const CollectionsFeed = () => {
           delete newCursors[collection];
         }
         
-        // Add this collection's records to our overall array
-        if (isInitialLoad) {
-          // For chart initialization, add all records to chart data
-          allChartRecords = [...allChartRecords, ...collectionRecords];
-        } else if (isLoadMore) {
-          // For load more, only add to both arrays if within display limit
-          allChartRecords = [...allChartRecords, ...collectionRecords];
+        // Add records to appropriate arrays
+        allChartRecords = [...allChartRecords, ...collectionRecords];
+        
+        // For display timeline, we might want to be more selective
+        if (isLoadMore || !isInitialDeepLoad) {
           allRecords = [...allRecords, ...collectionRecords];
-        } else {
-          // For regular display, add to both
-          allChartRecords = [...allChartRecords, ...collectionRecords];
-          allRecords = [...allRecords, ...collectionRecords];
+        } else if (isInitialDeepLoad) {
+          // For initial load, we'll filter later to just show the most recent
+          // This keeps allRecords separate from chart data until we're done
         }
       }
       
-      // Filter and sort all records based on the selected timestamp source
-      const filteredChartRecords = allChartRecords.filter(record => {
+      // Filter and sort records based on selected timestamp source
+      const filterAndSort = (recordArray) => recordArray.filter(record => {
+        // Only include records with valid timestamps based on selected mode
         if (useRkeyTimestamp) {
           return record.rkeyTimestamp !== null;
         } else {
           return record.contentTimestamp !== null;
         }
-      });
-      
-      // Sort by timestamp (newest first)
-      const sortedChartRecords = [...filteredChartRecords].sort((a, b) => {
+      }).sort((a, b) => {
+        // Sort newest first
         const aTime = useRkeyTimestamp ? a.rkeyTimestamp : a.contentTimestamp;
         const bTime = useRkeyTimestamp ? b.rkeyTimestamp : b.contentTimestamp;
         return new Date(bTime) - new Date(aTime);
       });
       
-      // For timeline display, limit records to most recent ones
-      let displayRecords = [...sortedChartRecords];
-      if (!isLoadMore) {
-        displayRecords = displayRecords.slice(0, 20);
+      // Process chart records
+      const sortedChartRecords = filterAndSort(allChartRecords);
+      
+      // For timeline display
+      let displayRecords;
+      if (isInitialDeepLoad) {
+        // If this was the initial deep load, take the most recent records for display
+        displayRecords = sortedChartRecords.slice(0, 20);
+      } else {
+        // Otherwise process the display records separately
+        displayRecords = filterAndSort(allRecords);
       }
       
-      console.log(`Fetched total of ${sortedChartRecords.length} records for chart, displaying ${displayRecords.length}`);
+      console.log(`Fetched ${sortedChartRecords.length} records for chart, showing ${displayRecords.length} in timeline`);
       
       // Update state
       setRecords(displayRecords);
@@ -347,15 +350,16 @@ const CollectionsFeed = () => {
       setCollectionCursors(newCursors);
       setFetchingMore(false);
       
-      // Turn off chart loading if it was on
-      if (chartLoading) {
-        setChartLoading(false);
-      }
+      // Always set chartLoading to false when done, regardless of initial state
+      setChartLoading(false);
+      console.log("Setting chart loading to FALSE");
+      
     } catch (err) {
       console.error('Error fetching collection records:', err);
       setError('Failed to fetch records. Please try again.');
       setFetchingMore(false);
-      setChartLoading(false); // Make sure we turn off chart loading on error
+      setChartLoading(false); // Always reset on error
+      console.log("Setting chart loading to FALSE (error case)");
     }
   };
   
@@ -475,6 +479,7 @@ const CollectionsFeed = () => {
                 records={allRecordsForChart} 
                 collections={collections}
                 loading={chartLoading}
+                key={`chart-${chartLoading}-${allRecordsForChart.length}`} // Add a key to force re-render
               />
               
               <div className="feed-controls">

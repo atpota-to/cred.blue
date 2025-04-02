@@ -65,6 +65,29 @@ const FeedTimeline = ({ records, serviceEndpoint }) => {
             ? `${record.value.text.substring(0, 100)}...` 
             : record.value.text
         };
+        
+        // Detect if it's a reply post
+        if (record.value.reply && record.value.reply.parent) {
+          result.isReply = true;
+          result.replyParent = record.value.reply.parent.uri;
+          result.replyRoot = record.value.reply.root?.uri || record.value.reply.parent.uri;
+        }
+        
+        // Detect if it's a quote post
+        if (record.value.embed && 
+            (record.value.embed['$type'] === 'app.bsky.embed.record' || 
+             record.value.embed['$type'] === 'app.bsky.embed.recordWithMedia')) {
+          result.isQuote = true;
+          
+          // Extract the quoted record URI
+          if (record.value.embed.record) {
+            if (record.value.embed.record.uri) {
+              result.quotedUri = record.value.embed.record.uri;
+            } else if (record.value.embed.record.record && record.value.embed.record.record.uri) {
+              result.quotedUri = record.value.embed.record.record.uri;
+            }
+          }
+        }
       }
       
       // Handle likes
@@ -117,6 +140,16 @@ const FeedTimeline = ({ records, serviceEndpoint }) => {
           result = result || {};
           result.selfBskyUrl = selfBskyUrl;
         }
+      }
+      
+      // For reply posts, add the parent post URL if possible
+      if (result && result.isReply && result.replyParent) {
+        result.replyParentUrl = getBskyAppUrl(result.replyParent);
+      }
+      
+      // For quote posts, add the quoted post URL if possible
+      if (result && result.isQuote && result.quotedUri) {
+        result.quotedUrl = getBskyAppUrl(result.quotedUri);
       }
       
       return result;
@@ -235,6 +268,12 @@ const FeedTimeline = ({ records, serviceEndpoint }) => {
               {record.value && record.value.$type && (
                 <div className="record-type">
                   <span className="type-label">Type:</span> {record.value.$type}
+                  {content && content.isReply && (
+                    <span className="post-type-badge post-type-reply">Reply</span>
+                  )}
+                  {content && content.isQuote && (
+                    <span className="post-type-badge post-type-quote">Quote</span>
+                  )}
                 </div>
               )}
               
@@ -268,7 +307,35 @@ const FeedTimeline = ({ records, serviceEndpoint }) => {
                       </a>
                     )}
                     
-                    {content.selfBskyUrl && !content.bskyUrl && (
+                    {content.replyParentUrl && (
+                      <a 
+                        href={content.replyParentUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="bsky-link"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M8 0L14.9282 4V12L8 16L1.0718 12V4L8 0Z" fill="#0085ff"/>
+                        </svg>
+                        <span className="bsky-link-text">View Parent Post on Bluesky</span>
+                      </a>
+                    )}
+                    
+                    {content.quotedUrl && (
+                      <a 
+                        href={content.quotedUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="bsky-link"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M8 0L14.9282 4V12L8 16L1.0718 12V4L8 0Z" fill="#0085ff"/>
+                        </svg>
+                        <span className="bsky-link-text">View Quoted Post on Bluesky</span>
+                      </a>
+                    )}
+                    
+                    {content.selfBskyUrl && !content.bskyUrl && !content.replyParentUrl && !content.quotedUrl && (
                       <a 
                         href={content.selfBskyUrl} 
                         target="_blank" 

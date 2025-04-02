@@ -213,6 +213,36 @@
     margin-top: 8px;
   }
   
+  .post-type-badge {
+    display: inline-block;
+    font-size: 0.75rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 8px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  
+  .post-type-reply {
+    background-color: rgba(79, 195, 247, 0.15);
+    color: #0288d1;
+  }
+  
+  .post-type-quote {
+    background-color: rgba(126, 87, 194, 0.15);
+    color: #7e57c2;
+  }
+  
+  .dark-mode .post-type-reply {
+    background-color: rgba(79, 195, 247, 0.3);
+    color: #81d4fa;
+  }
+  
+  .dark-mode .post-type-quote {
+    background-color: rgba(126, 87, 194, 0.3);
+    color: #b39ddb;
+  }
+  
   .record-json {
     background-color: var(--background);
     border-radius: 5px;

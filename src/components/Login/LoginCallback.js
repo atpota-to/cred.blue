@@ -5,13 +5,20 @@ import Loading from '../Loading/Loading';
 
 // This component handles the callback redirect from the Bluesky OAuth process
 const LoginCallback = () => {
-  const { loading, isAuthenticated, checkAuthStatus } = useAuth();
+  const { loading, isAuthenticated, session, checkAuthStatus } = useAuth();
   const [error, setError] = useState(null);
   const [returnUrl, setReturnUrl] = useState('/');
   const [processingComplete, setProcessingComplete] = useState(false);
   const location = useLocation();
   const callbackAttempts = useRef(0);
   const maxAttempts = 2;
+  
+  useEffect(() => {
+    // If we already have authentication after loading, we can redirect
+    if (!loading && isAuthenticated && session) {
+      setProcessingComplete(true);
+    }
+  }, [loading, isAuthenticated, session]);
 
   useEffect(() => {
     // Skip if already processed or max attempts reached
@@ -55,26 +62,52 @@ const LoginCallback = () => {
           return;
         }
 
+        // Already authenticated? Don't do anything else
+        if (isAuthenticated && session) {
+          console.log('Already authenticated, completing processing');
+          setProcessingComplete(true);
+          return;
+        }
+
         // Check server-side authentication status
         const authResult = await checkAuthStatus();
-        setProcessingComplete(true);
         
-        if (!authResult) {
+        // Consider authentication successful if:
+        // 1. checkAuthStatus returned true OR
+        // 2. isAuthenticated is now true (state might have updated separately)
+        if (authResult || isAuthenticated) {
+          console.log('Auth check success, completing processing');
+          setProcessingComplete(true);
+        } else {
+          console.error('Auth check failed, setting error');
           setError('Authentication failed. Could not establish a valid session.');
+          setProcessingComplete(true);
         }
       } catch (err) {
         console.error('Error handling login callback:', err);
-        setError('Failed to complete login process');
-        setProcessingComplete(true);
+        // If we have a session despite the error, still consider it successful
+        if (session && isAuthenticated) {
+          console.log('Error occurred but we have a session, proceeding');
+          setProcessingComplete(true);
+        } else {
+          setError('Failed to complete login process');
+          setProcessingComplete(true);
+        }
       }
     };
 
     handleCallback();
-  }, [location, checkAuthStatus, processingComplete]);
+  }, [location, checkAuthStatus, isAuthenticated, session, processingComplete]);
 
   // Don't redirect immediately while loading - wait for the check to complete
   if (loading && !processingComplete) {
     return <Loading message="Processing login..." />;
+  }
+
+  // If we're authenticated regardless of errors, redirect
+  if (isAuthenticated && session) {
+    console.log(`Redirecting to ${returnUrl} since we have a session`);
+    return <Navigate to={returnUrl} replace />;
   }
 
   if (error) {

@@ -63,25 +63,42 @@ export const AuthProvider = ({ children }) => {
           setClient(oauthClient);
           
           if (result?.session) {
-            // If client has session but server doesn't, we need to sync them
-            await fetch('/api/sync-session', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({ 
-                did: result.session.sub,
-                handle: result.session.handle
-              }),
-              credentials: 'include'
-            });
+            console.log('Found existing OAuth session:', result.session);
             
-            setSession(result.session);
+            // If client has session but server doesn't, we need to sync them
+            try {
+              const syncResponse = await fetch('/api/sync-session', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ 
+                  did: result.session.sub,
+                  handle: result.session.handle
+                }),
+                credentials: 'include'
+              });
+              
+              if (syncResponse.ok) {
+                const syncData = await syncResponse.json();
+                console.log('Session sync successful:', syncData);
+                // Use the server session data which may have more info
+                setSession(syncData.user);
+              } else {
+                console.warn('Session sync failed, using client session');
+                // Still use the client session if sync fails
+                setSession(result.session);
+              }
+            } catch (syncError) {
+              console.error('Error syncing session:', syncError);
+              // If sync fails, still use the client session
+              setSession(result.session);
+            }
           }
           
           // Listen for session deletion events
           oauthClient.addEventListener('deleted', (event) => {
-            if (event.data.did === session?.sub) {
+            if (event.data.did === session?.sub || event.data.did === session?.did) {
               setSession(null);
               // Also logout from server
               fetch('/api/logout', {

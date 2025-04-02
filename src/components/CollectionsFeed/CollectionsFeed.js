@@ -25,6 +25,7 @@ const CollectionsFeed = () => {
   const [collectionCursors, setCollectionCursors] = useState({});
   const [fetchingMore, setFetchingMore] = useState(false);
   const [searchPerformed, setSearchPerformed] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   
   // Effect to load data if username is provided in URL
   useEffect(() => {
@@ -95,6 +96,44 @@ const CollectionsFeed = () => {
     }
   };
   
+  // Helper function to extract timestamp from record
+  const extractTimestamp = (record) => {
+    // First check if createdAt exists directly in the value
+    if (record.value?.createdAt) {
+      return record.value.createdAt;
+    }
+    
+    // Otherwise try to find a timestamp in the record
+    // We'll use a recursive function to search through the object
+    const findTimestamp = (obj) => {
+      if (!obj || typeof obj !== 'object') return null;
+      
+      // Look for common timestamp fields
+      const timestampFields = ['createdAt', 'indexedAt', 'timestamp', 'time', 'date'];
+      for (const field of timestampFields) {
+        if (obj[field] && typeof obj[field] === 'string') {
+          // Check if it looks like an ISO date string
+          if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(obj[field])) {
+            return obj[field];
+          }
+        }
+      }
+      
+      // Recursively search through child objects
+      for (const key in obj) {
+        if (typeof obj[key] === 'object' && obj[key] !== null) {
+          const found = findTimestamp(obj[key]);
+          if (found) return found;
+        }
+      }
+      
+      return null;
+    };
+    
+    // Try to find a timestamp in the record
+    return findTimestamp(record) || new Date().toISOString(); // Fallback to current time
+  };
+
   // Function to fetch records from collections
   const fetchCollectionRecords = async (userDid, endpoint, collectionsList, isLoadMore = false) => {
     try {
@@ -104,10 +143,14 @@ const CollectionsFeed = () => {
       let allRecords = isLoadMore ? [...records] : [];
       const newCursors = { ...collectionCursors };
       
+      // Calculate a cutoff date (90 days ago)
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - 90);
+      
       // Fetch records for each collection in parallel
       const fetchPromises = collectionsList.map(async (collection) => {
-        // Limit to 5 records per collection initially (for 20 records total across ~4 collections)
-        let url = `${endpoint}/xrpc/com.atproto.repo.listRecords?repo=${encodeURIComponent(userDid)}&collection=${encodeURIComponent(collection)}&limit=5`;
+        // Fetch up to 100 records per collection to ensure we get a good sample
+        let url = `${endpoint}/xrpc/com.atproto.repo.listRecords?repo=${encodeURIComponent(userDid)}&collection=${encodeURIComponent(collection)}&limit=100`;
         
         // Add cursor if loading more and we have a cursor for this collection
         if (isLoadMore && newCursors[collection]) {
@@ -132,13 +175,16 @@ const CollectionsFeed = () => {
         }
         
         // Process and format records
-        return data.records.map(record => ({
-          ...record,
-          collection,
-          collectionType: record.value?.$type || collection,
-          timestamp: record.value?.createdAt || null,
-          rkey: record.uri.split('/').pop(),
-        }));
+        return data.records.map(record => {
+          const timestamp = extractTimestamp(record);
+          return {
+            ...record,
+            collection,
+            collectionType: record.value?.$type || collection,
+            timestamp,
+            rkey: record.uri.split('/').pop(),
+          };
+        });
       });
       
       // Wait for all fetch operations to complete
@@ -156,9 +202,9 @@ const CollectionsFeed = () => {
         return new Date(b.timestamp) - new Date(a.timestamp);
       });
       
-      // If not loading more, limit to 20 most recent records
+      // If not loading more, limit to 50 most recent records for initial display
       if (!isLoadMore) {
-        allRecords = allRecords.slice(0, 20);
+        allRecords = allRecords.slice(0, 50);
       }
       
       setRecords(allRecords);
@@ -276,43 +322,76 @@ const CollectionsFeed = () => {
               
               <div className="feed-controls">
                 <div className="filter-container">
-                  <div className="filter-header">
-                    <h3>Filter Collections</h3>
-                    <div className="filter-actions">
-                      <button 
-                        className="select-all-button"
-                        onClick={selectAllCollections}
-                        disabled={collections.length === selectedCollections.length}
-                      >
-                        Select All
-                      </button>
-                      <button 
-                        className="deselect-all-button"
-                        onClick={deselectAllCollections}
-                        disabled={selectedCollections.length === 0}
-                      >
-                        Deselect All
-                      </button>
-                    </div>
+                  <div 
+                    className="dropdown-toggle"
+                    onClick={() => setDropdownOpen(!dropdownOpen)}
+                  >
+                    <span>
+                      Filter Collections
+                      {selectedCollections.length > 0 && (
+                        <span className="selected-collections-count">
+                          {selectedCollections.length}
+                        </span>
+                      )}
+                    </span>
+                    <span className={`arrow ${dropdownOpen ? 'open' : ''}`}>▼</span>
                   </div>
                   
-                  <div className="collections-filter">
-                    {collections.map(collection => (
-                      <div 
-                        key={collection} 
-                        className={`collection-item ${selectedCollections.includes(collection) ? 'selected' : ''}`}
-                        onClick={() => toggleCollection(collection)}
-                      >
-                        <input
-                          type="checkbox"
-                          className="collection-item-checkbox"
-                          checked={selectedCollections.includes(collection)}
-                          onChange={() => {}} // Handled by the div onClick
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                        <span className="collection-item-name">{collection}</span>
+                  {dropdownOpen && (
+                    <div className="dropdown-backdrop open" onClick={() => setDropdownOpen(false)} />
+                  )}
+                  
+                  <div className={`dropdown-menu ${dropdownOpen ? 'open' : ''}`}>
+                    <div className="filter-header">
+                      <h3>Select Collections</h3>
+                      <div className="filter-actions">
+                        <button 
+                          className="select-all-button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            selectAllCollections();
+                          }}
+                          disabled={collections.length === selectedCollections.length}
+                        >
+                          Select All
+                        </button>
+                        <button 
+                          className="deselect-all-button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deselectAllCollections();
+                          }}
+                          disabled={selectedCollections.length === 0}
+                        >
+                          Deselect All
+                        </button>
                       </div>
-                    ))}
+                    </div>
+                    
+                    <div className="collections-filter">
+                      {collections.map(collection => (
+                        <div 
+                          key={collection} 
+                          className={`collection-item ${selectedCollections.includes(collection) ? 'selected' : ''}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleCollection(collection);
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            className="collection-item-checkbox"
+                            checked={selectedCollections.includes(collection)}
+                            onChange={() => {}} // Handled by the div onClick
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleCollection(collection);
+                            }}
+                          />
+                          <span className="collection-item-name">{collection}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
                 
@@ -331,7 +410,10 @@ const CollectionsFeed = () => {
                 </div>
               ) : (
                 <>
-                  <FeedTimeline records={filteredRecords} />
+                  <FeedTimeline 
+                    records={filteredRecords} 
+                    serviceEndpoint={serviceEndpoint}
+                  />
                   
                   {filteredRecords.length === 0 && (
                     <div className="no-records-message">

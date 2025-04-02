@@ -35,6 +35,8 @@ const CollectionsFeed = () => {
   const [useRkeyTimestamp, setUseRkeyTimestamp] = useState(false);
   const [compactView, setCompactView] = useState(false);
   const [displayCount, setDisplayCount] = useState(25);
+  const [debugInfo, setDebugInfo] = useState(null);
+  const [showDebug, setShowDebug] = useState(false);
   
   // Helper functions
   const tidToTimestamp = (tid) => {
@@ -152,7 +154,14 @@ const CollectionsFeed = () => {
           
           try {
             // Verify authentication before making the request
-            await checkAuthStatus();
+            const authResult = await checkAuthStatus();
+            
+            if (!authResult) {
+              setError('You are not authenticated. Please log in again.');
+              const returnUrl = encodeURIComponent(window.location.pathname);
+              navigate(`/login?returnUrl=${returnUrl}`);
+              return;
+            }
             
             const response = await fetch(url, {
               credentials: 'include'
@@ -160,18 +169,28 @@ const CollectionsFeed = () => {
             
             if (!response.ok) {
               if (response.status === 401) {
-                // Handle unauthorized
-                await checkAuthStatus();
-                if (!isAuthenticated) {
-                  throw new Error('Authentication required. Please log in again.');
+                // Try to refresh auth once
+                const refreshResult = await checkAuthStatus();
+                if (!refreshResult) {
+                  setError('Your session has expired. Please log in again.');
+                  const returnUrl = encodeURIComponent(window.location.pathname);
+                  navigate(`/login?returnUrl=${returnUrl}`);
+                  return;
                 }
-                // If we're still authenticated, retry this request
+                
+                // If still authenticated, retry this request
                 continue;
               }
               
               // Try to parse the error response
-              const errorData = await response.json().catch(() => null);
-              const errorMessage = errorData?.error || errorData?.details || response.statusText;
+              let errorMessage;
+              try {
+                const errorData = await response.json();
+                errorMessage = errorData?.error || errorData?.details || response.statusText;
+              } catch (jsonErr) {
+                errorMessage = response.statusText || `HTTP ${response.status}`;
+              }
+              
               console.error(`Error fetching records for ${collection}: ${errorMessage}`);
               
               // Skip this collection but continue with others
@@ -229,9 +248,9 @@ const CollectionsFeed = () => {
             
             // Store the cursor for this collection for future "load more" operations
             newCursors[collection] = data.cursor;
-          } catch (err) {
-            console.error(`Error fetching page ${pageCount} for collection ${collection}:`, err);
-            // Break the pagination loop for this collection, but continue with others
+          } catch (error) {
+            console.error(`Error processing collection ${collection}:`, error);
+            // Continue with other collections
             break;
           }
         } // End of pagination while loop
@@ -322,35 +341,65 @@ const CollectionsFeed = () => {
       
     } catch (err) {
       console.error('Error fetching collection records:', err);
-      setError('Failed to fetch records. ' + (err.message || 'Please try again.'));
+      if (err.message && err.message.includes('authenticated')) {
+        setError('Authentication error: ' + err.message);
+        // Allow time to see the error before redirecting
+        setTimeout(() => {
+          const returnUrl = encodeURIComponent(window.location.pathname);
+          navigate(`/login?returnUrl=${returnUrl}`);
+        }, 3000);
+      } else {
+        setError(`Failed to load records: ${err.message}`);
+      }
       setFetchingMore(false);
-      setChartLoading(false); // Always reset on error
-      throw err; // Re-throw to allow handling in calling functions
+      setChartLoading(false);
     }
-  }, [records, allRecordsForChart, collectionCursors, useRkeyTimestamp, checkAuthStatus, isAuthenticated]);
+  }, [navigate, checkAuthStatus]);
   
   // Now define loadUserData after fetchCollectionRecords is defined
-  const loadUserData = useCallback(async (userHandle) => {
+  const loadUserData = useCallback(async (usernameOrDid) => {
+    if (!usernameOrDid || !isAuthenticated) {
+      setError('Please enter a username or DID, and ensure you are logged in.');
+      return;
+    }
+    
+    // Reset state for new search
+    setLoading(true);
+    setError('');
+    setDid('');
+    setServiceEndpoint('');
+    setCollections([]);
+    setSelectedCollections([]);
+    setRecords([]);
+    setAllRecordsForChart([]);
+    setCollectionCursors({});
+    
     try {
-      setLoading(true);
-      setError('');
+      // First, verify authentication is still valid
+      const authResult = await checkAuthStatus();
       
-      // Update URL with the username
-      if (userHandle !== username) {
-        navigate(`/omnifeed/${encodeURIComponent(userHandle)}`);
+      if (!authResult) {
+        setError('Your session has expired. Please log in again.');
+        setLoading(false);
+        setTimeout(() => {
+          const returnUrl = encodeURIComponent(window.location.pathname);
+          navigate(`/login?returnUrl=${returnUrl}`);
+        }, 3000);
+        return;
       }
       
-      // Resolve handle to DID
-      let userDid;
-      try {
-        userDid = await resolveHandleToDid(userHandle);
-        setDid(userDid);
-      } catch (resolveError) {
-        console.error('Error resolving handle to DID:', resolveError);
-        setError(`Could not resolve handle "${userHandle}". Please check the handle and try again.`);
-        setInitialLoad(false);
-        setLoading(false);
-        return;
+      // Continue with resolving the handle to DID
+      let userDid = usernameOrDid;
+      
+      // If input doesn't look like a DID, try to resolve it as a handle
+      if (!userDid.startsWith('did:')) {
+        try {
+          userDid = await resolveHandleToDid(usernameOrDid);
+        } catch (resolveErr) {
+          setError(`Could not resolve handle: ${resolveErr.message}`);
+          setLoading(false);
+          return;
+        }
       }
       
       // Get service endpoint
@@ -360,7 +409,7 @@ const CollectionsFeed = () => {
         setServiceEndpoint(endpoint);
       } catch (endpointError) {
         console.error('Error getting service endpoint:', endpointError);
-        setError(`Could not determine PDS endpoint for "${userHandle}". The user's server may be offline.`);
+        setError(`Could not determine PDS endpoint for "${userDid}". The user's server may be offline.`);
         setInitialLoad(false);
         setLoading(false);
         return;
@@ -391,7 +440,17 @@ const CollectionsFeed = () => {
       while (retryCount <= maxRetries) {
         try {
           // Verify authentication before making the request
-          await checkAuthStatus();
+          const authResult = await checkAuthStatus();
+          
+          if (!authResult) {
+            setError('Your session has expired. Please log in again.');
+            setLoading(false);
+            setTimeout(() => {
+              const returnUrl = encodeURIComponent(window.location.pathname);
+              navigate(`/login?returnUrl=${returnUrl}`);
+            }, 3000);
+            return;
+          }
           
           const collectionsResponse = await fetch(`/api/collections/${encodeURIComponent(userDid)}?endpoint=${encodeURIComponent(endpoint)}`, {
             credentials: 'include'
@@ -399,11 +458,16 @@ const CollectionsFeed = () => {
           
           if (!collectionsResponse.ok) {
             if (collectionsResponse.status === 401) {
-              // Handle unauthorized
-              console.log('Authentication required, checking status and redirecting if needed');
-              await checkAuthStatus();
-              if (!isAuthenticated) {
-                throw new Error('Authentication required. Please log in again.');
+              // Try to refresh auth once more
+              const refreshResult = await checkAuthStatus();
+              if (!refreshResult) {
+                setError('You are not authenticated. Please log in to continue.');
+                setLoading(false);
+                setTimeout(() => {
+                  const returnUrl = encodeURIComponent(window.location.pathname);
+                  navigate(`/login?returnUrl=${returnUrl}`);
+                }, 3000);
+                return;
               }
               // If we're still here, try again
               retryCount++;
@@ -411,8 +475,14 @@ const CollectionsFeed = () => {
             }
             
             // Try to parse the error response
-            const errorData = await collectionsResponse.json().catch(() => null);
-            const errorMessage = errorData?.error || errorData?.details || collectionsResponse.statusText;
+            let errorMessage;
+            try {
+              const errorData = await collectionsResponse.json();
+              errorMessage = errorData?.error || errorData?.details || collectionsResponse.statusText;
+            } catch (jsonErr) {
+              errorMessage = collectionsResponse.statusText || `HTTP ${collectionsResponse.status}`;
+            }
+            
             throw new Error(`Error fetching collections: ${errorMessage}`);
           }
           
@@ -453,11 +523,31 @@ const CollectionsFeed = () => {
       setLoading(false);
     } catch (err) {
       console.error('Error loading user data:', err);
-      setError(err.message || 'An error occurred while loading data.');
+      
+      // Provide more user-friendly error messages
+      let userMessage = 'An error occurred while loading data.';
+      
+      if (err.message) {
+        if (err.message.includes('authenticated')) {
+          userMessage = 'Authentication error: Please log in again.';
+          setTimeout(() => {
+            const returnUrl = encodeURIComponent(window.location.pathname);
+            navigate(`/login?returnUrl=${returnUrl}`);
+          }, 3000);
+        } else if (err.message.includes('fetch')) {
+          userMessage = 'Network error: Could not connect to the server.';
+        } else if (err.message.includes('collections')) {
+          userMessage = `Collections error: ${err.message}`;
+        } else {
+          userMessage = err.message;
+        }
+      }
+      
+      setError(userMessage);
       setInitialLoad(false);
       setLoading(false);
     }
-  }, [username, navigate, checkAuthStatus, fetchCollectionRecords, isAuthenticated]);
+  }, [navigate, checkAuthStatus]);
   
   // Now place useEffects after all the callbacks are defined
   
@@ -465,14 +555,27 @@ const CollectionsFeed = () => {
   useEffect(() => {
     const verifyAuth = async () => {
       try {
-        await checkAuthStatus();
-        if (!isAuthenticated) {
+        setLoading(true);
+        const authResult = await checkAuthStatus();
+        
+        if (!authResult) {
+          console.log('Not authenticated, redirecting to login');
           // Save the current path for redirect after login
           const returnUrl = encodeURIComponent(window.location.pathname);
           navigate(`/login?returnUrl=${returnUrl}`);
+          return;
+        }
+        
+        setLoading(false);
+        
+        // If we have a username in the URL and we're authenticated, load the data
+        if (username && authResult) {
+          loadUserData(username);
         }
       } catch (err) {
         console.error('Auth verification failed:', err);
+        setError('Authentication failed. Please try logging in again.');
+        setLoading(false);
         navigate('/login');
       }
     };
@@ -480,18 +583,21 @@ const CollectionsFeed = () => {
     verifyAuth();
     
     // Set up periodic auth checks
-    const interval = setInterval(checkAuthStatus, 30000); // Check every 30 seconds
+    const interval = setInterval(async () => {
+      const authResult = await checkAuthStatus();
+      if (!authResult && isAuthenticated) {
+        // Session was lost during browsing
+        setError('Your session has expired. Please log in again.');
+        // Show the error for 3 seconds before redirecting
+        setTimeout(() => {
+          const returnUrl = encodeURIComponent(window.location.pathname);
+          navigate(`/login?returnUrl=${returnUrl}`);
+        }, 3000);
+      }
+    }, 30000); // Check every 30 seconds
     
     return () => clearInterval(interval);
-  }, [isAuthenticated, checkAuthStatus, navigate]);
-  
-  // Effect to load data if username is provided in URL
-  useEffect(() => {
-    // Only load data if authenticated and username is available
-    if (username && isAuthenticated) {
-      loadUserData(username);
-    }
-  }, [username, isAuthenticated, loadUserData]);
+  }, [isAuthenticated, checkAuthStatus, navigate, username, loadUserData]);
   
   // Effect to watch for selected collections changes
   useEffect(() => {
@@ -713,6 +819,28 @@ const CollectionsFeed = () => {
     }
   };
   
+  // Add a function to fetch debug info
+  const fetchDebugInfo = async () => {
+    try {
+      const response = await fetch('/api/debug/session', {
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        setDebugInfo({ error: `Server returned ${response.status}: ${response.statusText}` });
+        return;
+      }
+      
+      const data = await response.json();
+      setDebugInfo(data);
+    } catch (error) {
+      console.error('Error fetching debug info:', error);
+      setDebugInfo({ error: error.message });
+    }
+    
+    setShowDebug(true);
+  };
+  
   return (
     <div className="collections-feed-container">
       <Helmet>
@@ -754,18 +882,35 @@ const CollectionsFeed = () => {
           </div>
         </form>
         
-        {/* Error message with retry option */}
+        {/* Error message with more styling and retry button */}
         {error && (
-          <div className="error-message">
-            <p><strong>Error:</strong> {error}</p>
-            {did && serviceEndpoint && (
-              <button 
-                onClick={() => loadUserData(handle || searchTerm)}
-                className="retry-button"
-              >
-                Retry
-              </button>
-            )}
+          <div className="error-container">
+            <div className="error-message">
+              <p>{error}</p>
+              {error.includes('authenticated') ? (
+                <button 
+                  className="error-action-button"
+                  onClick={() => {
+                    const returnUrl = encodeURIComponent(window.location.pathname);
+                    navigate(`/login?returnUrl=${returnUrl}`);
+                  }}
+                >
+                  Go to Login
+                </button>
+              ) : (
+                <button 
+                  className="error-action-button"
+                  onClick={() => {
+                    setError('');
+                    if (username) {
+                      loadUserData(username);
+                    }
+                  }}
+                >
+                  Retry
+                </button>
+              )}
+            </div>
           </div>
         )}
         
@@ -893,6 +1038,27 @@ const CollectionsFeed = () => {
                 )}
               </>
             )}
+          </div>
+        )}
+      </div>
+      
+      {/* Debug button */}
+      <div className="debug-controls">
+        <button 
+          className="debug-button" 
+          onClick={fetchDebugInfo}
+          title="Check authentication status"
+        >
+          Debug Auth
+        </button>
+        
+        {showDebug && debugInfo && (
+          <div className="debug-panel">
+            <div className="debug-header">
+              <h4>Session Debug Info</h4>
+              <button onClick={() => setShowDebug(false)}>Close</button>
+            </div>
+            <pre>{JSON.stringify(debugInfo, null, 2)}</pre>
           </div>
         )}
       </div>

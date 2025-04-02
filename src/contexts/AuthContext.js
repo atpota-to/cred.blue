@@ -337,14 +337,25 @@ export const AuthProvider = ({ children }) => {
     lastAuthCheck.current = now;
 
     try {
+      console.log('Checking auth status...');
+      
+      const controller = new AbortController();
+      // Set a timeout for the fetch to prevent hanging requests
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
       const response = await fetch('/api/auth/status', {
-        credentials: 'include'
+        credentials: 'include',
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
         console.error('Auth status check failed with status:', response.status);
+        // If we get a server error, we should still rely on client-side session
+        // to prevent users from getting logged out due to temporary server issues
         authCheckInProgress.current = false;
-        return !!session; // Return current state on error
+        return !!session;
       }
       
       const data = await response.json();
@@ -395,25 +406,51 @@ export const AuthProvider = ({ children }) => {
             
             console.log('Syncing with data:', sessionData);
             
-            // Try to sync one more time
-            const syncResponse = await fetch('/api/sync-session', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify(sessionData),
-              credentials: 'include'
-            });
+            // Add a timeout for sync request
+            const syncController = new AbortController();
+            const syncTimeoutId = setTimeout(() => syncController.abort(), 5000);
             
-            if (syncResponse.ok) {
-              console.log('Session sync successful during status check');
-              const syncData = await syncResponse.json();
-              setSession(syncData.user);
+            try {
+              // Try to sync one more time
+              const syncResponse = await fetch('/api/sync-session', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(sessionData),
+                credentials: 'include',
+                signal: syncController.signal
+              });
+              
+              clearTimeout(syncTimeoutId);
+              
+              if (syncResponse.ok) {
+                console.log('Session sync successful during status check');
+                const syncData = await syncResponse.json();
+                setSession(syncData.user);
+                authCheckInProgress.current = false;
+                return true;
+              } else {
+                console.error('Sync response was not ok:', syncResponse.status);
+                // If server explicitly rejects our sync attempt, we should clear session
+                setSession(null);
+                authCheckInProgress.current = false;
+                return false;
+              }
+            } catch (syncFetchError) {
+              clearTimeout(syncTimeoutId);
+              console.error('Network error during sync request:', syncFetchError);
+              
+              // On network errors, we should keep the current session state to prevent
+              // users from being logged out due to temporary connectivity issues
               authCheckInProgress.current = false;
-              return true;
+              return !!session;
             }
           } catch (syncError) {
-            console.error('Error syncing during status check:', syncError);
+            console.error('Error in sync logic during status check:', syncError);
+            // If there's an error in our sync logic, keep current session
+            authCheckInProgress.current = false;
+            return !!session;
           }
         }
         
@@ -425,8 +462,15 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (err) {
       console.error('Error checking auth status:', err);
+      // For network errors, don't log out the user
+      if (err.name === 'AbortError') {
+        console.warn('Auth status check timed out');
+      } else if (err.name === 'TypeError' && err.message.includes('Network request failed')) {
+        console.warn('Network request failed during auth check - keeping current session state');
+      }
+      
       authCheckInProgress.current = false;
-      return !!session; // Fall back to current session state
+      return !!session; // Fall back to current session state on errors
     }
   }, [session, client]);
 

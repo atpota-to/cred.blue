@@ -85,16 +85,25 @@ export const AuthProvider = ({ children }) => {
   // Logout the user
   const logout = async () => {
     if (!client || !session) {
-      console.log('No client or session available for logout'); // Debug log
+      console.log('No client or session available for logout');
       return;
     }
     
     try {
-      console.log('Attempting logout with client:', client); // Debug log
-      // Instead of using client methods, we'll just clear the session
+      console.log('Attempting logout with client:', client);
+      
+      // Clear the session state
       setSession(null);
+      
       // Clear any stored tokens or session data
       localStorage.removeItem('atproto_session');
+      
+      // Clear any other potential storage items
+      localStorage.removeItem('atproto_state');
+      localStorage.removeItem('atproto_refresh_token');
+      
+      // Force a page reload to clear any remaining state
+      window.location.href = '/';
     } catch (err) {
       console.error('Logout failed:', err);
       setError(err.message);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import './Login.css';
@@ -8,9 +8,10 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [returnUrl, setReturnUrl] = useState('');
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const hasRedirected = useRef(false);
 
   // Extract returnUrl from query params
   useEffect(() => {
@@ -23,19 +24,33 @@ const Login = () => {
 
   // Redirect if already authenticated
   useEffect(() => {
-    if (isAuthenticated) {
+    // Skip redirection if loading is still true
+    if (loading) return;
+    
+    // Only redirect once to prevent loop
+    if (isAuthenticated && !hasRedirected.current) {
+      hasRedirected.current = true;
       // Navigate to return URL if it exists, otherwise to home
       navigate(returnUrl || '/');
     }
-  }, [isAuthenticated, navigate, returnUrl]);
+  }, [isAuthenticated, navigate, returnUrl, loading]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Don't allow login attempt if already authenticated
+    if (isAuthenticated) {
+      navigate(returnUrl || '/');
+      return;
+    }
     
     if (!handle) {
       setError('Please enter your Bluesky handle');
       return;
     }
+    
+    // Don't allow multiple concurrent login attempts
+    if (isLoading) return;
     
     setIsLoading(true);
     setError('');
@@ -73,7 +88,7 @@ const Login = () => {
               value={handle}
               onChange={(e) => setHandle(e.target.value)}
               placeholder="yourhandle.bsky.social"
-              disabled={isLoading}
+              disabled={isLoading || isAuthenticated}
               autoFocus
             />
           </div>
@@ -81,7 +96,7 @@ const Login = () => {
           <button 
             type="submit" 
             className="login-button"
-            disabled={isLoading}
+            disabled={isLoading || isAuthenticated}
           >
             {isLoading ? 'Connecting...' : 'Login with Bluesky'}
           </button>

@@ -8,7 +8,17 @@ export const ALLOWED_ACCOUNTS = [
 export const isAccountAllowed = (session) => {
   if (!session) return false;
   
-  // Check both DID and handle
-  return ALLOWED_ACCOUNTS.includes(session.sub) || 
-         ALLOWED_ACCOUNTS.includes(session.handle);
+  // For Bluesky OAuth session
+  if (session.sub && session.handle) {
+    return ALLOWED_ACCOUNTS.includes(session.sub) || 
+           ALLOWED_ACCOUNTS.includes(session.handle);
+  }
+  
+  // For server-side session
+  if (session.did && session.handle) {
+    return ALLOWED_ACCOUNTS.includes(session.did) || 
+           ALLOWED_ACCOUNTS.includes(session.handle);
+  }
+  
+  return false;
 }; 

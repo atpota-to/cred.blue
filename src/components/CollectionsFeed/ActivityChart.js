@@ -327,7 +327,7 @@ const ActivityChart = ({ records, collections, loading = false }) => {
       </div>
     );
   } else {
-    console.log(`ActivityChart not in loading state, has ${records?.length || 0} records`);
+    console.log(`ActivityChart has ${records?.length || 0} records for ${collections?.length || 0} collections`);
   }
   
   // Ensure records array exists and has items
@@ -376,7 +376,8 @@ const ActivityChart = ({ records, collections, loading = false }) => {
       
       <div className="chart-summary">
         <p>
-          Showing activity across {collections ? collections.length : 0} collections.
+          Showing activity across {collections ? collections.length : 0} collections
+          {records ? ` (${records.length} records)` : ''}.
         </p>
       </div>
     </div>

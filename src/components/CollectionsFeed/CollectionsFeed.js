@@ -40,9 +40,25 @@ const CollectionsFeed = () => {
   
   // Effect to watch for selected collections changes
   useEffect(() => {
+    // Only trigger a data fetch when filters change if we haven't fetched enough data previously
     if (selectedCollections.length > 0 && did && serviceEndpoint && searchPerformed) {
-      // Refresh records when filters change, but not during initial load
-      fetchCollectionRecords(did, serviceEndpoint, selectedCollections);
+      const hasUnfetchedCollections = selectedCollections.some(col => 
+        !allRecordsForChart.some(record => record.collection === col)
+      );
+      
+      if (hasUnfetchedCollections) {
+        // Only fetch collections we haven't fetched before
+        const collectionsToFetch = selectedCollections.filter(col => 
+          !allRecordsForChart.some(record => record.collection === col)
+        );
+        
+        if (collectionsToFetch.length > 0) {
+          console.log(`Fetching data for new collections: ${collectionsToFetch.join(', ')}`);
+          fetchCollectionRecords(did, serviceEndpoint, collectionsToFetch);
+        }
+      } else {
+        console.log('All collections already fetched, just filtering existing data');
+      }
     }
   }, [selectedCollections]);
   
@@ -406,8 +422,13 @@ const CollectionsFeed = () => {
     }
   };
   
-  // Filter records based on selected collections
+  // Filter records for timeline display based on selected collections
   const filteredRecords = records.filter(record => 
+    selectedCollections.includes(record.collection)
+  );
+
+  // Filter ALL chart records based on selected collections - this is what the chart will use
+  const filteredChartRecords = allRecordsForChart.filter(record => 
     selectedCollections.includes(record.collection)
   );
   
@@ -476,10 +497,10 @@ const CollectionsFeed = () => {
               
               {/* Activity Chart */}
               <ActivityChart 
-                records={allRecordsForChart} 
-                collections={collections}
+                records={filteredChartRecords} 
+                collections={selectedCollections}
                 loading={chartLoading}
-                key={`chart-${chartLoading}-${allRecordsForChart.length}`} // Add a key to force re-render
+                key={`chart-${chartLoading}-${filteredChartRecords.length}-${selectedCollections.join(',')}`} // Add a key to force re-render
               />
               
               <div className="feed-controls">

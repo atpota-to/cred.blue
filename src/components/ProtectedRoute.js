@@ -9,50 +9,71 @@ const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading, session, checkAuthStatus } = useAuth();
   const location = useLocation();
   const [redirecting, setRedirecting] = useState(false);
+  const [checkingStatus, setCheckingStatus] = useState(false);
   const checkCount = useRef(0);
   const maxChecks = 3; // Maximum number of checks to prevent infinite loops
   
+  // Perform an immediate auth check when the component mounts
   useEffect(() => {
-    // Prevent excessive auth checks
-    if (checkCount.current >= maxChecks) {
-      console.error("Maximum auth check attempts reached. Stopping to prevent infinite loop.");
-      return;
-    }
+    const checkAuth = async () => {
+      if (checkCount.current >= maxChecks) {
+        console.error("Maximum auth check attempts reached. Stopping to prevent infinite loop.");
+        return;
+      }
+      
+      // Only proceed if not already checking, not already redirecting, and not loading
+      if (!isAuthenticated && !checkingStatus && !redirecting && !loading) {
+        try {
+          console.log("ProtectedRoute: Checking authentication status");
+          setCheckingStatus(true);
+          checkCount.current += 1;
+          await checkAuthStatus();
+        } catch (error) {
+          console.error("ProtectedRoute: Auth check failed:", error);
+        } finally {
+          setCheckingStatus(false);
+        }
+      }
+    };
     
-    // Only check if not already authenticated and not already redirecting
-    if (!isAuthenticated && !redirecting && !loading) {
-      checkCount.current += 1;
-      checkAuthStatus();
-    }
+    // Call immediately on mount or when dependency values change
+    checkAuth();
     
-    // Set up interval for periodic checks - but only if authenticated
-    // This prevents constantly checking while unauthenticated
+    // Set up interval for periodic checks only if authenticated
     let interval;
-    if (isAuthenticated) {
-      interval = setInterval(checkAuthStatus, 30000); // Check every 30 seconds
+    if (isAuthenticated && session) {
+      console.log("ProtectedRoute: Setting up periodic auth checks");
+      interval = setInterval(() => {
+        checkAuthStatus().catch(err => {
+          console.error("Error in periodic auth check:", err);
+        });
+      }, 30000); // Check every 30 seconds
     }
     
     return () => {
-      if (interval) clearInterval(interval);
+      if (interval) {
+        console.log("ProtectedRoute: Clearing periodic auth checks");
+        clearInterval(interval);
+      }
     };
-  }, [isAuthenticated, checkAuthStatus, redirecting, loading]);
+  }, [isAuthenticated, checkAuthStatus, redirecting, loading, checkingStatus, session]);
 
   // Show loading state while authentication is being checked
-  if (loading) {
+  if (loading || checkingStatus) {
     return <Loading message="Checking authentication..." />;
   }
 
   // If not authenticated, redirect to login with return URL
   if (!isAuthenticated && !redirecting) {
+    console.log("ProtectedRoute: Not authenticated, redirecting to login");
     setRedirecting(true); // Prevent multiple redirects
     const returnUrl = encodeURIComponent(location.pathname);
     return <Navigate to={`/login?returnUrl=${returnUrl}`} replace />;
   }
 
   // Check if user is allowed
-  // Only check if we have detailed user info
-  // If we're using server-side sessions, we might not need this check
   if (session && session.handle && !isAccountAllowed(session)) {
+    console.log("ProtectedRoute: User not in allowlist, redirecting to supporter page");
     return <Navigate to="/supporter" replace />;
   }
 
@@ -60,6 +81,7 @@ const ProtectedRoute = ({ children }) => {
   checkCount.current = 0;
   
   // Render children if authenticated and allowed
+  console.log("ProtectedRoute: Authentication successful, rendering protected content");
   return children;
 };
 

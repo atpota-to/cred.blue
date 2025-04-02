@@ -32,25 +32,37 @@ export const AuthProvider = ({ children }) => {
   const [error, setError] = useState(null);
   const lastAuthCheck = useRef(0);
   const authCheckInProgress = useRef(false);
+  const didInitialCheck = useRef(false);
 
   // Initialize the OAuth client
   useEffect(() => {
     const initializeAuth = async () => {
+      if (didInitialCheck.current) return;
+      didInitialCheck.current = true;
+      
       try {
         // First check server-side authentication status
+        console.log('Checking server authentication status');
         const serverAuthResponse = await fetch('/api/auth/status', {
           credentials: 'include'
         });
         
-        const serverAuthData = await serverAuthResponse.json();
-        
-        if (serverAuthData.isAuthenticated) {
-          setSession(serverAuthData.user);
-          setLoading(false);
-          return;
+        if (!serverAuthResponse.ok) {
+          console.error('Server auth check failed with status:', serverAuthResponse.status);
+        } else {
+          const serverAuthData = await serverAuthResponse.json();
+          console.log('Server auth status:', serverAuthData);
+          
+          if (serverAuthData.isAuthenticated || serverAuthData.authenticated) {
+            console.log('Already authenticated on server, setting session');
+            setSession(serverAuthData.user);
+            setLoading(false);
+            return;
+          }
         }
 
         // If not authenticated on the server, check client OAuth
+        console.log('Not authenticated on server, initializing OAuth client');
         const oauthClient = new BrowserOAuthClient({
           clientMetadata,
           handleResolver: 'https://bsky.social',
@@ -65,45 +77,76 @@ export const AuthProvider = ({ children }) => {
           if (result?.session) {
             console.log('Found existing OAuth session:', result.session);
             
-            // If client has session but server doesn't, we need to sync them
+            // Check if atproto_session exists in localStorage as a backup
+            const atprotoSession = localStorage.getItem('atproto_session');
+            console.log('atproto_session in localStorage:', atprotoSession ? 'exists' : 'not found');
+            
+            // Format session data for our internal use and sync with server
+            const sessionData = {
+              did: result.session.sub,
+              handle: result.session.handle
+            };
+            
+            console.log('Syncing session with server:', sessionData);
+            
+            // Try to sync with server
             try {
               const syncResponse = await fetch('/api/sync-session', {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ 
-                  did: result.session.sub,
-                  handle: result.session.handle
-                }),
+                body: JSON.stringify(sessionData),
                 credentials: 'include'
               });
               
               if (syncResponse.ok) {
                 const syncData = await syncResponse.json();
-                console.log('Session sync successful:', syncData);
-                // Use the server session data which may have more info
+                console.log('Initial session sync successful:', syncData);
                 setSession(syncData.user);
               } else {
-                console.warn('Session sync failed, using client session');
-                // Still use the client session if sync fails
-                setSession(result.session);
+                console.warn('Initial session sync failed:', await syncResponse.text());
+                
+                // If sync fails, use client session in our internal format
+                console.log('Using client session as fallback');
+                setSession({
+                  did: result.session.sub,
+                  handle: result.session.handle,
+                  displayName: result.session.handle
+                });
               }
             } catch (syncError) {
-              console.error('Error syncing session:', syncError);
-              // If sync fails, still use the client session
-              setSession(result.session);
+              console.error('Error syncing initial session:', syncError);
+              
+              // If sync fails, still use client session in our internal format
+              setSession({
+                did: result.session.sub,
+                handle: result.session.handle,
+                displayName: result.session.handle
+              });
             }
+          } else {
+            console.log('No existing OAuth session found');
           }
           
           // Listen for session deletion events
           oauthClient.addEventListener('deleted', (event) => {
-            if (event.data.did === session?.sub || event.data.did === session?.did) {
+            console.log('Session deletion event received:', event.data);
+            
+            // Get current session DID at the time of event
+            const currentSession = session;
+            const sessionDid = currentSession?.did || currentSession?.sub;
+            
+            if (event.data.did === sessionDid) {
+              console.log('Current session was deleted, logging out');
               setSession(null);
+              
               // Also logout from server
               fetch('/api/logout', {
                 method: 'POST',
                 credentials: 'include'
+              }).catch(err => {
+                console.error('Error during server logout after deletion:', err);
               });
             }
           });
@@ -224,13 +267,67 @@ export const AuthProvider = ({ children }) => {
       const response = await fetch('/api/auth/status', {
         credentials: 'include'
       });
-      const data = await response.json();
       
-      if (data.isAuthenticated) {
-        setSession(data.user);
+      if (!response.ok) {
+        console.error('Auth status check failed with status:', response.status);
+        authCheckInProgress.current = false;
+        return !!session; // Return current state on error
+      }
+      
+      const data = await response.json();
+      console.log('Auth status check response:', data);
+      
+      const isAuthenticated = data.isAuthenticated || data.authenticated;
+      
+      if (isAuthenticated && data.user) {
+        // If server session is different from current session, update it
+        const currentSessionJSON = session ? JSON.stringify(session) : '';
+        const newSessionJSON = JSON.stringify(data.user);
+        
+        if (currentSessionJSON !== newSessionJSON) {
+          console.log('Updating session from server data');
+          setSession(data.user);
+        }
+        
         authCheckInProgress.current = false;
         return true;
       } else {
+        // If server says not authenticated but we have a client session,
+        // try to synchronize sessions
+        if (session && client) {
+          try {
+            console.log('Server says not authenticated but we have a client session, trying to sync');
+            
+            // Format session data properly
+            const sessionData = {
+              did: session.did || session.sub,
+              handle: session.handle
+            };
+            
+            // Try to sync one more time
+            const syncResponse = await fetch('/api/sync-session', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(sessionData),
+              credentials: 'include'
+            });
+            
+            if (syncResponse.ok) {
+              console.log('Session sync successful during status check');
+              const syncData = await syncResponse.json();
+              setSession(syncData.user);
+              authCheckInProgress.current = false;
+              return true;
+            }
+          } catch (syncError) {
+            console.error('Error syncing during status check:', syncError);
+          }
+        }
+        
+        // If all attempts failed and the server says we're not authenticated
+        console.log('Server says not authenticated, clearing session');
         setSession(null);
         authCheckInProgress.current = false;
         return false;
@@ -238,9 +335,9 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       console.error('Error checking auth status:', err);
       authCheckInProgress.current = false;
-      return false;
+      return !!session; // Fall back to current session state
     }
-  }, [session]);
+  }, [session, client]);
 
   return (
     <AuthContext.Provider 

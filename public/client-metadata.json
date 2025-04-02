@@ -3,7 +3,6 @@
   "client_name": "cred.blue",
   "client_uri": "https://testing.cred.blue",
   "redirect_uris": [
-    "https://cred.blue/login/callback",
     "https://testing.cred.blue/login/callback"
   ],
   "logo_uri": "https://testing.cred.blue/favicon.ico",

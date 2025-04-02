@@ -1,5 +1,44 @@
 /* Omnifeed.css (renamed from CollectionsFeed.css) */
 
+/* Activity Chart Styles */
+.activity-chart-container {
+  background-color: var(--navbar-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.dark-mode .activity-chart-container {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.activity-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.activity-chart-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--button-bg);
+  margin: 0;
+}
+
+.activity-chart-loading {
+  min-height: 200px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: var(--text);
+  font-size: 0.9rem;
+  opacity: 0.7;
+}
+
 /* Page Title Styles */
 .page-title {
   text-align: center;
@@ -185,20 +224,25 @@ body.dark-mode .omni-info-card {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 3px;
-    border-radius: 4px;
+    padding: 6px;
+    border-radius: 6px;
     color: var(--text);
-    opacity: 0.5;
-    transition: opacity 0.2s, background-color 0.2s;
+    opacity: 0.6;
+    transition: all 0.2s ease;
   }
   
   .copy-button:hover {
     opacity: 1;
-    background-color: rgba(0, 0, 0, 0.05);
+    background-color: rgba(0, 0, 0, 0.08);
+    transform: scale(1.1);
   }
   
   .dark-mode .copy-button:hover {
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: rgba(255, 255, 255, 0.15);
+  }
+  
+  .copy-button:active {
+    transform: scale(0.95);
   }
   
   .copy-button.copied {
@@ -207,18 +251,29 @@ body.dark-mode .omni-info-card {
     position: relative;
   }
   
+  .copy-button.copied svg {
+    stroke: #4CAF50;
+  }
+  
   .copy-button.copied::after {
     content: "Copied!";
     position: absolute;
-    bottom: -20px;
+    bottom: -24px;
     left: 50%;
     transform: translateX(-50%);
     background-color: var(--button-bg);
     color: white;
     padding: 3px 8px;
-    border-radius: 4px;
-    font-size: 0.7rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
     white-space: nowrap;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    animation: fadeInUp 0.3s ease;
+  }
+  
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translate(-50%, 5px); }
+    to { opacity: 1; transform: translate(-50%, 0); }
   }
   
   /* Feed Controls Styles */
@@ -458,6 +513,10 @@ body.dark-mode .omni-info-card {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 15px;
+    background-color: var(--navbar-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 12px 15px;
   }
   
   .toggle-container {
@@ -473,19 +532,39 @@ body.dark-mode .omni-info-card {
     display: flex;
     align-items: center;
     gap: 10px;
+    background-color: var(--background);
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--card-border);
   }
   
   .timestamp-toggle label {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     color: var(--text);
     cursor: pointer;
     display: flex;
     align-items: center;
+    font-weight: 500;
   }
   
   .timestamp-toggle input[type="checkbox"] {
-    margin-right: 5px;
+    margin-right: 8px;
     cursor: pointer;
+    width: 16px;
+    height: 16px;
+    accent-color: var(--button-bg);
+  }
+  
+  .timestamp-toggle span {
+    cursor: help;
+    font-size: 0.85rem;
+    margin-left: 5px;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+  }
+  
+  .timestamp-toggle span:hover {
+    opacity: 1;
   }
   
   /* View Toggle Switch Styles */
@@ -498,6 +577,10 @@ body.dark-mode .omni-info-card {
     display: flex;
     align-items: center;
     gap: 10px;
+    background-color: var(--background);
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--card-border);
   }
   
   .switch {
@@ -560,9 +643,10 @@ body.dark-mode .omni-info-card {
   }
   
   .toggle-label {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     color: var(--text);
     margin-left: 5px;
+    font-weight: 500;
   }
   
   .refresh-button {

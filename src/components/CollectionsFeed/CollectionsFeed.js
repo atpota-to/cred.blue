@@ -221,10 +221,12 @@ const CollectionsFeed = () => {
         let pageCount = 0;
         let collectionRecords = [];
         let reachedCutoff = false;
+        let totalRecordsForCollection = 0;
         
-        // For initial deep load, we paginate more to get historical data
+        // For initial deep load, we need to paginate as many times as needed to get all historical data
         // For regular timeline browsing or load more, we just get one page
-        const maxPages = isInitialDeepLoad ? 20 : 1; 
+        // Set a high limit for safety, but essentially allow unlimited pagination until we hit the cutoff date
+        const maxPages = isInitialDeepLoad ? 1000 : 1; 
         
         while (hasMoreRecords && pageCount < maxPages && !reachedCutoff) {
           // Fetch up to 100 records per page
@@ -249,6 +251,9 @@ const CollectionsFeed = () => {
           
           // Process records from this page
           if (data.records && data.records.length > 0) {
+            console.log(`Received ${data.records.length} records for ${collection} page ${pageCount}`);
+            totalRecordsForCollection += data.records.length;
+            
             const processedRecords = data.records.map(record => {
               const contentTimestamp = extractTimestamp(record);
               const rkey = record.uri.split('/').pop();
@@ -274,10 +279,19 @@ const CollectionsFeed = () => {
                 return recordTime < oldest ? recordTime : oldest;
               }, Date.now());
               
-              // If the oldest record on this page is older than our cutoff, we'll stop
-              if (oldestRecordTime < cutoffDate.getTime()) {
+              // For commonly used collections like likes, follows, etc.,
+              // we need to be more cautious about when to stop paginating
+              const isHighVolumeCollection = collection.includes('like') || 
+                                            collection.includes('follow') || 
+                                            collection.includes('repost');
+                
+              // If the oldest record on this page is older than our cutoff, and
+              // 1. It's not a high volume collection, OR
+              // 2. It's a high volume collection but we've already gone through several pages
+              if (oldestRecordTime < cutoffDate.getTime() && 
+                  (!isHighVolumeCollection || pageCount > 5)) {
                 reachedCutoff = true;
-                console.log(`Reached cutoff date for ${collection} on page ${pageCount}`);
+                console.log(`Reached cutoff date for ${collection} on page ${pageCount} (oldest: ${new Date(oldestRecordTime).toISOString()})`);
                 
                 // Filter records from this page to only include those after cutoff
                 const filteredRecords = processedRecords.filter(record => {
@@ -286,10 +300,18 @@ const CollectionsFeed = () => {
                   return new Date(timestamp) >= cutoffDate;
                 });
                 
+                console.log(`  - Kept ${filteredRecords.length} of ${processedRecords.length} records from final page`);
                 collectionRecords.push(...filteredRecords);
               } else {
-                // All records on this page are within our date range
+                // All records on this page are within our date range 
+                // OR we need to keep paginating through high-volume collections
                 collectionRecords.push(...processedRecords);
+                
+                // If we found some records close to the cutoff date but haven't reached it yet,
+                // log this for debugging purposes
+                if (oldestRecordTime < cutoffDate.getTime() + (7 * 24 * 60 * 60 * 1000)) { // within 7 days of cutoff
+                  console.log(`  - Getting close to cutoff date, oldest record = ${new Date(oldestRecordTime).toISOString()}`);
+                }
               }
             } else {
               // For regular browsing, include all records from the page
@@ -316,6 +338,16 @@ const CollectionsFeed = () => {
         } else {
           // No more records for this collection
           delete newCursors[collection];
+        }
+        
+        console.log(`Finished fetching ${collection}: Retrieved ${totalRecordsForCollection} records in ${pageCount} pages`);
+        console.log(`  - After filtering: ${collectionRecords.length} records in 90-day window`);
+        if (reachedCutoff) {
+          console.log(`  - Stopped because records older than 90 days were found`);
+        } else if (!cursor) {
+          console.log(`  - Stopped because no more records were available`);
+        } else if (pageCount >= maxPages) {
+          console.log(`  - Stopped because max page limit (${maxPages}) was reached`);
         }
         
         // Add records to appropriate arrays
@@ -358,7 +390,23 @@ const CollectionsFeed = () => {
         displayRecords = filterAndSort(allRecords);
       }
       
-      console.log(`Fetched ${sortedChartRecords.length} records for chart, showing ${displayRecords.length} in timeline`);
+      // Create a summary of records per collection for debugging
+      const collectionSummary = {};
+      sortedChartRecords.forEach(record => {
+        if (!collectionSummary[record.collection]) {
+          collectionSummary[record.collection] = 0;
+        }
+        collectionSummary[record.collection]++;
+      });
+      
+      console.log("Collection record counts in 90-day period:");
+      Object.entries(collectionSummary)
+        .sort((a, b) => b[1] - a[1]) // Sort by count descending
+        .forEach(([collection, count]) => {
+          console.log(`  - ${collection}: ${count} records`);
+        });
+      
+      console.log(`Fetched ${sortedChartRecords.length} total records for chart, showing ${displayRecords.length} in timeline`);
       
       // Update state
       setRecords(displayRecords);

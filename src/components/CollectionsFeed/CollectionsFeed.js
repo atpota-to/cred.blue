@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import SearchBar from '../SearchBar/SearchBar';
 import FeedTimeline from './FeedTimeline';
+import ActivityChart from './ActivityChart';
 import './CollectionsFeed.css'; // Renamed to Omnifeed.css but keeping same filename for compatibility
 import { resolveHandleToDid, getServiceEndpointForDid } from '../../accountData';
 import MatterLoadingAnimation from '../MatterLoadingAnimation';
@@ -19,6 +20,7 @@ const CollectionsFeed = () => {
   const [collections, setCollections] = useState([]);
   const [selectedCollections, setSelectedCollections] = useState([]);
   const [records, setRecords] = useState([]);
+  const [allRecordsForChart, setAllRecordsForChart] = useState([]); // All records for chart visualization
   const [loading, setLoading] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
   const [error, setError] = useState('');
@@ -181,9 +183,9 @@ const CollectionsFeed = () => {
       let allRecords = isLoadMore ? [...records] : [];
       const newCursors = { ...collectionCursors };
       
-      // Calculate a cutoff date (90 days ago)
+      // Calculate a cutoff date (90 days ago by default for chart visualization)
       const cutoffDate = new Date();
-      cutoffDate.setDate(cutoffDate.getDate() - 90);
+      cutoffDate.setDate(cutoffDate.getDate() - 90); // 3 months
       
       // Fetch records for each collection in parallel
       const fetchPromises = collectionsList.map(async (collection) => {
@@ -255,12 +257,17 @@ const CollectionsFeed = () => {
         return new Date(bTime) - new Date(aTime); // Newest first
       });
       
-      // If not loading more, limit to 50 most recent records for initial display
+      // We'll keep all records for charting purposes, but only show the most recent ones in the timeline
+      const chartRecords = [...allRecords];
+      
+      // If not loading more, limit to 20 most recent records for initial display in timeline
       if (!isLoadMore) {
-        allRecords = allRecords.slice(0, 50);
+        allRecords = allRecords.slice(0, 20);
       }
       
+      // Update state with both the display records and the full set for charting
       setRecords(allRecords);
+      setAllRecordsForChart(prev => isLoadMore ? [...prev, ...chartRecords] : chartRecords);
       setCollectionCursors(newCursors);
       setFetchingMore(false);
     } catch (err) {
@@ -373,10 +380,19 @@ const CollectionsFeed = () => {
             </div>
           ) : searchPerformed && (
             <div className="feed-container">
+              <div className="page-title">
+                <h1>Omnifeed</h1>
+              </div>
               <div className="user-header">
                 <h1>{displayName}</h1>
                 <h2>@{handle}</h2>
               </div>
+              
+              {/* Activity Chart */}
+              <ActivityChart 
+                records={allRecordsForChart} 
+                collections={collections}
+              />
               
               <div className="feed-controls">
                 <div className="filter-container">

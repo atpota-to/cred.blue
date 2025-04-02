@@ -250,10 +250,17 @@ const FeedTimeline = ({ records, serviceEndpoint }) => {
         const content = getRecordContent(record);
         
         return (
-          <div key={`${record.collection}-${record.rkey}-${index}`} className="feed-item">
+          <div 
+            key={`${record.collection}-${record.rkey}-${index}`} 
+            className={`feed-item ${record.collection.startsWith('app.bsky.') ? 'bsky-item' : 'atproto-item'}`}
+          >
             <div className="feed-item-header">
               <div className="collection-type">
-                <span className="collection-name">{record.collection.split('.').pop()}</span>
+                <span 
+                  className={`collection-name ${record.collection.startsWith('app.bsky.') ? 'bsky-collection' : 'atproto-collection'}`}
+                >
+                  {record.collection.split('.').pop()}
+                </span>
                 <span className="collection-full">{record.collection}</span>
               </div>
               <div 
@@ -382,14 +389,54 @@ const FeedTimeline = ({ records, serviceEndpoint }) => {
               )}
               
               {modalData && !modalLoading && !modalError && (
-                <div className="record-json">
-                  {JSON.stringify(modalData, null, 2)}
+                <div className="record-json-container">
+                  <div className="record-json-header">
+                    <span>Record Data</span>
+                    <button 
+                      className="copy-json-button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(JSON.stringify(modalData, null, 2));
+                        // Show temporary success message
+                        const button = event.currentTarget;
+                        button.classList.add('copied');
+                        setTimeout(() => button.classList.remove('copied'), 2000);
+                      }}
+                      title="Copy JSON"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                      </svg>
+                      Copy JSON
+                    </button>
+                  </div>
+                  <div className="record-json">
+                    {JSON.stringify(modalData, null, 2)}
+                  </div>
                 </div>
               )}
             </div>
             
             <div className="record-modal-footer">
-              <span>URI: {selectedRecord.uri}</span>
+              <div className="record-uri">
+                <span>URI: {selectedRecord.uri}</span>
+                <button 
+                  className="copy-button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(selectedRecord.uri);
+                    // Show temporary success message
+                    const button = event.currentTarget;
+                    button.classList.add('copied');
+                    setTimeout(() => button.classList.remove('copied'), 2000);
+                  }}
+                  title="Copy URI"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
         </div>

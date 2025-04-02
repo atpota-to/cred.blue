@@ -40,6 +40,24 @@
     color: var(--button-bg);
   }
   
+  /* Different styling for Bluesky vs ATProto collections */
+  .bsky-collection {
+    color: #0085ff; /* Lighter blue for Bluesky */
+  }
+  
+  .atproto-collection {
+    color: #003366; /* Darker blue for ATProto */
+  }
+  
+  /* Different border styling for items */
+  .bsky-item {
+    border-color: rgba(0, 133, 255, 0.5); /* Lighter blue for Bluesky */
+  }
+  
+  .atproto-item {
+    border-color: rgba(0, 51, 102, 0.5); /* Darker blue for ATProto */
+  }
+  
   .collection-full {
     margin-left: 8px;
     font-size: 0.8rem;
@@ -243,9 +261,56 @@
     color: #b39ddb;
   }
   
-  .record-json {
+  .record-json-container {
     background-color: var(--background);
     border-radius: 5px;
+    overflow: hidden;
+  }
+  
+  .record-json-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 15px;
+    background-color: rgba(0, 0, 0, 0.05);
+    border-bottom: 1px solid var(--card-border);
+  }
+  
+  .dark-mode .record-json-header {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+  
+  .copy-json-button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: 1px solid var(--card-border);
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    color: var(--text);
+    transition: background-color 0.2s, color 0.2s;
+  }
+  
+  .copy-json-button:hover {
+    background-color: var(--button-bg);
+    color: white;
+  }
+  
+  .copy-json-button.copied {
+    background-color: #4CAF50;
+    color: white;
+    border-color: #4CAF50;
+  }
+  
+  .copy-json-button.copied::after {
+    content: "✓";
+    margin-left: 5px;
+  }
+  
+  .record-json {
     padding: 15px;
     font-family: monospace;
     white-space: pre-wrap;
@@ -254,11 +319,35 @@
     overflow-y: auto;
   }
   
+  .record-uri {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: monospace;
+    font-size: 0.9rem;
+  }
+  
   /* Dark mode overrides */
   .dark-mode .feed-item {
     background: #2c2c2c;
     border: 5px solid #444;
     box-shadow: 0 2px 4px rgba(0,0,0,0.6);
+  }
+  
+  .dark-mode .bsky-collection {
+    color: #4da8ff; /* Lighter blue for Bluesky in dark mode */
+  }
+  
+  .dark-mode .atproto-collection {
+    color: #6699cc; /* Slightly lighter blue for ATProto in dark mode */
+  }
+  
+  .dark-mode .bsky-item {
+    border-color: rgba(77, 168, 255, 0.5); /* Lighter blue for Bluesky in dark mode */
+  }
+  
+  .dark-mode .atproto-item {
+    border-color: rgba(102, 153, 204, 0.5); /* Darker blue for ATProto in dark mode */
   }
   
   .dark-mode .feed-item-header,

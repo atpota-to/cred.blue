@@ -35,12 +35,19 @@ const ActivityChart = ({ records, collections, loading = false }) => {
   const atprotoBorderColor = 'rgba(0, 51, 102, 1)';
   
   useEffect(() => {
-    // Only generate chart data if we have records and we're not loading
-    if (records && records.length > 0 && !loading) {
+    // Generate chart data whenever records change or time period changes
+    // Don't wait for loading to be false - this ensures we regenerate as soon as we get new data
+    if (records && records.length > 0) {
       console.log(`Generating chart data for ${records.length} records with period ${timePeriod}`);
       generateChartData(records, timePeriod);
+    } else if (!loading) {
+      // If we have no records and we're not loading, reset chart data
+      setChartData({
+        labels: [],
+        datasets: []
+      });
     }
-  }, [records, timePeriod, loading]);
+  }, [records, timePeriod]);
   
   // Function to generate data for the chart based on selected time period
   const generateChartData = (allRecords, period) => {

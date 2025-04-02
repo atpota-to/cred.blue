@@ -196,10 +196,10 @@ const CollectionsFeed = () => {
     try {
       setFetchingMore(isLoadMore);
       
-      // If this is an initial load for chart data, set chartLoading
-      if (!isLoadMore) {
+      // Set chartLoading for initial load or when refreshing
+      if (!isLoadMore || collectionsList.length > 0) {
         setChartLoading(true);
-        console.log("Setting chart loading to TRUE");
+        console.log(`Setting chart loading to TRUE for ${isLoadMore ? 'refresh' : 'initial load'}`);
       }
       
       // Array to store all fetched records
@@ -408,9 +408,46 @@ const CollectionsFeed = () => {
       
       console.log(`Fetched ${sortedChartRecords.length} total records for chart, showing ${displayRecords.length} in timeline`);
       
+      // In the case of a refresh, sortedChartRecords only contains fresh data for selected collections
+      // We need to merge this with any existing data for other collections
+      const existingRecordsToKeep = isLoadMore ? [] : allRecordsForChart.filter(record => 
+        !collectionsList.includes(record.collection)
+      );
+      
+      // Variable to hold our final merged records
+      let mergedRecords;
+      
+      // For refresh, remove old data for the collections we just refreshed
+      if (!isLoadMore) {
+        console.log(`Removing old data for refreshed collections: ${collectionsList.join(', ')}`);
+        
+        // Count for stats
+        const beforeCount = existingRecordsToKeep.length + sortedChartRecords.length;
+        
+        // Remove duplicates that might exist in both arrays
+        // This can happen if we refreshed a collection we already had data for
+        const uniqueNewRecords = sortedChartRecords.filter(newRecord => {
+          // Check if this record has the exact same URI as an existing record
+          return !existingRecordsToKeep.some(existingRecord => 
+            existingRecord.uri === newRecord.uri
+          );
+        });
+        
+        // Merge fresh data with existing data for other collections
+        mergedRecords = [...existingRecordsToKeep, ...uniqueNewRecords];
+        console.log(`Merged ${existingRecordsToKeep.length} existing records with ${uniqueNewRecords.length} new unique records`);
+        console.log(`Total records: ${beforeCount} before deduplication, ${mergedRecords.length} after`);
+      }
+      else {
+        // For load more, just add all the new records
+        mergedRecords = [...existingRecordsToKeep, ...sortedChartRecords];
+      }
+      
+      console.log(`Final chart dataset size: ${mergedRecords.length} records`);
+      
       // Update state
       setRecords(displayRecords);
-      setAllRecordsForChart(sortedChartRecords);
+      setAllRecordsForChart(mergedRecords);
       setCollectionCursors(newCursors);
       setFetchingMore(false);
       
@@ -454,7 +491,24 @@ const CollectionsFeed = () => {
   // Handle refresh button click
   const handleRefresh = async () => {
     if (did && serviceEndpoint) {
-      await fetchCollectionRecords(did, serviceEndpoint, selectedCollections);
+      console.log("Refresh requested for selected collections:", selectedCollections);
+      
+      // Set loading state for chart to true
+      setChartLoading(true);
+      
+      try {
+        // The fetchCollectionRecords function will handle merging the new data
+        // with existing data for other collections
+        await fetchCollectionRecords(did, serviceEndpoint, selectedCollections, false);
+        
+        console.log("Refresh completed successfully");
+      } catch (err) {
+        console.error("Error during refresh:", err);
+        setError('Failed to refresh records. Please try again.');
+      } finally {
+        // Ensure loading state is reset
+        setChartLoading(false);
+      }
     }
   };
   
@@ -574,6 +628,48 @@ const CollectionsFeed = () => {
               <div className="user-header">
                 <h1>{displayName}</h1>
                 <h2>@{handle}</h2>
+                {did && (
+                  <div className="user-did">
+                    <span>DID: {did}</span>
+                    <button 
+                      className="copy-button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(did);
+                        // Show temporary success message
+                        const button = event.currentTarget;
+                        button.classList.add('copied');
+                        setTimeout(() => button.classList.remove('copied'), 2000);
+                      }}
+                      title="Copy DID"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                {serviceEndpoint && (
+                  <div className="user-endpoint">
+                    <span>Service: {serviceEndpoint}</span>
+                    <button 
+                      className="copy-button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(serviceEndpoint);
+                        // Show temporary success message
+                        const button = event.currentTarget;
+                        button.classList.add('copied');
+                        setTimeout(() => button.classList.remove('copied'), 2000);
+                      }}
+                      title="Copy Service Endpoint"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                      </svg>
+                    </button>
+                  </div>
+                )}
               </div>
               
               {/* Activity Chart */}
@@ -581,7 +677,7 @@ const CollectionsFeed = () => {
                 records={filteredChartRecords} 
                 collections={selectedCollections}
                 loading={chartLoading}
-                key={`chart-${chartLoading}-${filteredChartRecords.length}-${selectedCollections.join(',')}`} // Add a key to force re-render
+                key={`chart-${Date.now()}-${filteredChartRecords.length}-${selectedCollections.join(',')}`} // Use timestamp in key to ensure re-render on refresh
               />
               
               <div className="feed-controls">

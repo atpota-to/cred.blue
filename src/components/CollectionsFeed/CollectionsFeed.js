@@ -472,6 +472,8 @@ const CollectionsFeed = () => {
     } else {
       setSelectedCollections(prev => [...prev, collection]);
     }
+    // Reset display count when changing collections
+    setDisplayCount(25);
     // We don't need to manually refresh here since we added a useEffect hook
     // that watches for changes to selectedCollections
   };
@@ -479,6 +481,8 @@ const CollectionsFeed = () => {
   // Select all collections
   const selectAllCollections = () => {
     setSelectedCollections([...collections]);
+    // Reset display count when changing collections
+    setDisplayCount(25);
     // We don't need to manually refresh here since we added a useEffect hook
     // that watches for changes to selectedCollections
   };
@@ -486,6 +490,8 @@ const CollectionsFeed = () => {
   // Deselect all collections
   const deselectAllCollections = () => {
     setSelectedCollections([]);
+    // Reset display count
+    setDisplayCount(25);
     // No need to refresh as we'll show "no collections selected" message
   };
   
@@ -496,6 +502,9 @@ const CollectionsFeed = () => {
       
       // Set a loading state but not for the chart
       setLoading(true);
+      
+      // Reset display count to show only the first 25 records after refresh
+      setDisplayCount(25);
       
       try {
         // Fetch just the most recent records for the feed display
@@ -582,15 +591,10 @@ const CollectionsFeed = () => {
     // First check if we already have more records locally that we can show
     if (hasMoreRecordsLocally) {
       console.log("Loading more records from local cache");
-      // Simply increase the number of displayed records
-      const currentDisplayCount = filteredRecords.length;
+      // Simply increase the display count by 25 more records
       const nextBatchSize = 25;
-      
-      // Store the new count so our filteredRecords computation shows more records
-      setRecords(prev => {
-        // Create a dummy array of the right length to control how many records are shown
-        return Array(currentDisplayCount + nextBatchSize).fill(null);
-      });
+      setDisplayCount(prevCount => prevCount + nextBatchSize);
+      console.log(`Increasing display count to ${displayCount + nextBatchSize}`);
       
       setFetchingMore(false);
     } 
@@ -602,6 +606,8 @@ const CollectionsFeed = () => {
       
       if (collectionsToLoad.length > 0) {
         await fetchCollectionRecords(did, serviceEndpoint, collectionsToLoad, true);
+        // After fetching more, we can increase the display count to show them
+        setDisplayCount(prevCount => prevCount + 25);
       } else {
         setFetchingMore(false);
       }
@@ -616,9 +622,11 @@ const CollectionsFeed = () => {
     selectedCollections.includes(record.collection)
   );
 
-  // For timeline display, directly use the chart records but limit to most recent 25
+  // State to track how many records to display
+  const [displayCount, setDisplayCount] = useState(25);
+  
+  // For timeline display, directly use the chart records but limit to the current displayCount
   // This ensures we always show the most recent records for the selected collections
-  // regardless of what was initially loaded in the records state
   const filteredRecords = filteredChartRecords
     .sort((a, b) => {
       // Sort by timestamp (newest first)
@@ -626,7 +634,7 @@ const CollectionsFeed = () => {
       const bTime = useRkeyTimestamp ? b.rkeyTimestamp : b.contentTimestamp;
       return new Date(bTime) - new Date(aTime);
     })
-    .slice(0, fetchingMore ? records.length : 25); // Show 25 records initially, more when loading more
+    .slice(0, displayCount); // Show based on displayCount state
   
   // Check if more records can be loaded - either from API or from our existing dataset
   const hasMoreRecordsLocally = filteredChartRecords.length > filteredRecords.length;

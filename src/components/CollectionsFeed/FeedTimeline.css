@@ -95,6 +95,18 @@
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+  font-family: monospace;
+  font-size: 0.8rem;
+  background-color: var(--background);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--text);
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.compact-content:hover {
+  background-color: var(--button-bg);
+  color: white;
 }
 
 .compact-actions {
@@ -631,6 +643,14 @@
     
     .compact-content {
       white-space: normal;
-      word-break: break-word;
+      word-break: break-all;
+      display: inline-block;
+      margin-top: 2px;
+    }
+    
+    .compact-records-table td.content-col::before {
+      content: "TID: ";
+      font-weight: 600;
+      opacity: 0.6;
     }
   }

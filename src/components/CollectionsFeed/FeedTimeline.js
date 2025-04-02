@@ -254,7 +254,7 @@ const FeedTimeline = ({ records, serviceEndpoint, compactView = false }) => {
               <th className="collection-col">Collection</th>
               <th className="time-col">Time</th>
               <th className="type-col">Type</th>
-              <th className="content-col">Content</th>
+              <th className="content-col">TID/rkey</th>
               <th className="actions-col">Actions</th>
             </tr>
           </thead>
@@ -283,17 +283,8 @@ const FeedTimeline = ({ records, serviceEndpoint, compactView = false }) => {
                     </span>
                   </td>
                   <td className="content-col">
-                    <span className="compact-content" onClick={() => openModal(record)}>
-                      {content ? (
-                        content.subjectUri ? (
-                          <span className="record-link-compact" onClick={(e) => {
-                            e.stopPropagation();
-                            fetchRelatedRecord(content.subjectUri);
-                          }}>
-                            {content.content}
-                          </span>
-                        ) : content.content
-                      ) : record.rkey}
+                    <span className="compact-content record-key-link" onClick={() => openModal(record)}>
+                      {record.rkey}
                     </span>
                   </td>
                   <td className="actions-col">

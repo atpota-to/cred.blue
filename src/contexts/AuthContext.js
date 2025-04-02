@@ -147,29 +147,60 @@ export const AuthProvider = ({ children }) => {
 
   // Logout the user
   const logout = async () => {
-    if (!client || !session) {
-      console.log('No client or session available for logout');
-      return;
-    }
-    
     try {
-      console.log('Attempting logout with client:', client);
+      console.log('Starting logout process');
       
-      // Clear the session state
+      // First, try to logout from the server
+      try {
+        const response = await fetch('/api/logout', {
+          method: 'POST',
+          credentials: 'include'
+        });
+        
+        if (response.ok) {
+          console.log('Server logout successful');
+        } else {
+          console.warn('Server logout failed, continuing with client logout');
+        }
+      } catch (serverLogoutErr) {
+        console.error('Error during server logout:', serverLogoutErr);
+        // Continue with client-side logout even if server logout fails
+      }
+      
+      // Clear the session state immediately
       setSession(null);
       
-      // Clear any stored tokens or session data
-      localStorage.removeItem('atproto_session');
+      // If we have a client, try to clear its session too
+      if (client) {
+        try {
+          console.log('Attempting to clear OAuth client session');
+          
+          // Clear OAuth-specific storage items
+          localStorage.removeItem('atproto_session');
+          localStorage.removeItem('atproto_state');
+          localStorage.removeItem('atproto_refresh_token');
+          
+          // Check if there are any other localStorage items with 'atproto' in the key
+          Object.keys(localStorage).forEach(key => {
+            if (key.includes('atproto')) {
+              console.log(`Removing localStorage item: ${key}`);
+              localStorage.removeItem(key);
+            }
+          });
+        } catch (clientErr) {
+          console.error('Error clearing client storage:', clientErr);
+        }
+      } else {
+        console.warn('No OAuth client available for logout');
+      }
       
-      // Clear any other potential storage items
-      localStorage.removeItem('atproto_state');
-      localStorage.removeItem('atproto_refresh_token');
-      
-      // Force a page reload to clear any remaining state
+      // Force a reload to ensure all state is cleared
+      console.log('Completing logout - reloading page');
       window.location.href = '/';
     } catch (err) {
-      console.error('Logout failed:', err);
-      setError(err.message);
+      console.error('Logout process error:', err);
+      // Still try to reload even if there are errors
+      window.location.href = '/';
     }
   };
 

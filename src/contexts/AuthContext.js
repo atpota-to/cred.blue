@@ -1,0 +1,132 @@
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { BrowserOAuthClient } from '@atproto/oauth-client-browser';
+
+// Create auth context
+export const AuthContext = createContext(null);
+
+// Determine environment
+const isDevelopment = process.env.NODE_ENV === 'development';
+const hostname = window.location.hostname;
+
+// Set the appropriate domain based on the current hostname
+let domain;
+if (isDevelopment) {
+  domain = 'http://localhost:3000';
+} else if (hostname === 'testing.cred.blue') {
+  domain = 'https://testing.cred.blue';
+} else {
+  domain = 'https://cred.blue';
+}
+
+// Use the production client metadata URL for all environments
+// This ensures we don't need separate metadata files
+const metadataUrl = 'https://cred.blue/client-metadata.json';
+
+// Client metadata for Bluesky OAuth
+const clientMetadata = {
+  client_id: metadataUrl,
+  client_name: "Cred.blue",
+  client_uri: domain,
+  redirect_uris: [`${domain}/login/callback`],
+  logo_uri: `${domain}/favicon.ico`,
+  scope: "atproto",
+  grant_types: ["authorization_code", "refresh_token"],
+  response_types: ["code"],
+  token_endpoint_auth_method: "none",
+  application_type: "web",
+  dpop_bound_access_tokens: true
+};
+
+export const AuthProvider = ({ children }) => {
+  const [client, setClient] = useState(null);
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Initialize the OAuth client
+  useEffect(() => {
+    const initializeAuth = async () => {
+      try {
+        // Create the OAuth client
+        const oauthClient = new BrowserOAuthClient({
+          clientMetadata,
+          handleResolver: 'https://bsky.social', // Using bsky.social as handle resolver
+        });
+
+        // Initialize the client and check for existing sessions
+        const result = await oauthClient.init();
+        setClient(oauthClient);
+        
+        if (result?.session) {
+          setSession(result.session);
+        }
+        
+        // Listen for session deletion events
+        oauthClient.addEventListener('deleted', (event) => {
+          if (event.data.did === session?.sub) {
+            setSession(null);
+          }
+        });
+        
+        setLoading(false);
+      } catch (err) {
+        console.error('Auth initialization error:', err);
+        setError(err.message);
+        setLoading(false);
+      }
+    };
+
+    initializeAuth();
+  }, []);
+
+  // Initiate the login process
+  const login = async (handle) => {
+    if (!client) return;
+    
+    try {
+      // The signIn method will redirect the user to the OAuth server
+      await client.signIn(handle);
+      // This code won't execute as the page will be redirected
+    } catch (err) {
+      console.error('Login failed:', err);
+      setError(err.message);
+    }
+  };
+
+  // Logout the user
+  const logout = async () => {
+    if (!client || !session) return;
+    
+    try {
+      await client.logout(session.sub);
+      setSession(null);
+    } catch (err) {
+      console.error('Logout failed:', err);
+      setError(err.message);
+    }
+  };
+
+  return (
+    <AuthContext.Provider 
+      value={{ 
+        session, 
+        loading, 
+        error,
+        isAuthenticated: !!session,
+        login, 
+        logout 
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+// Custom hook to use the auth context
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === null) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}; 

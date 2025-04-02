@@ -20,46 +20,72 @@ import ZenPage from './components/ZenPage';
 import CompareScores from './components/CompareScores/CompareScores';
 import CollectionsFeed from './components/CollectionsFeed/CollectionsFeed';
 import AdminRoute from './components/Admin/AdminRoute';
+import ProtectedRoute from './components/ProtectedRoute';
+import Login from './components/Login/Login';
+import LoginCallback from './components/Login/LoginCallback';
+import { AuthProvider } from './contexts/AuthContext';
 import "./App.css";
 
 const App = () => {
   return (
     <>
-      <Router>
-        <div className="app-container" style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-          <Navbar />
-          <div className="main-container" style={{ flex: 1 }}>
-            <Routes>
-              {/* All routes are now public */}
-              <Route path="/home" element={<Home />} />
-              <Route path="/compare/:username1/:username2" element={<CompareScores />} />
-              <Route path="/compare" element={<CompareScores />} />
-              <Route path="/omnifeed/:username" element={<CollectionsFeed />} />
-              <Route path="/omnifeed" element={<CollectionsFeed />} />
-              <Route path="/alt-text" element={<AltTextRatingTool />} />
-              <Route path="/about" element={<About />} />
-              <Route path="/privacy" element={<Privacy />} />
-              <Route path="/terms" element={<Terms />} />
-              <Route path="/newsletter" element={<Newsletter />} />
-              <Route path="/supporter" element={<Supporter />} />
-              <Route path="/definitions" element={<Definitions />} />
-              <Route path="/leaderboard" element={<Leaderboard />} />
-              <Route path="/resources" element={<Resources />} />
-              <Route path="/shortcut" element={<Shortcut />} />
-              <Route path="/zen" element={<ZenPage />} />
-              <Route path="/methodology" element={<ScoringMethodology />} />
-              
-              {/* Handle both DIDs and regular usernames */}
-              <Route path="/:username" element={<UserProfile />} />
-              
-              {/* Default routes */}
-              <Route path="/" element={<Navigate to="/home" replace />} />
-              <Route path="*" element={<Navigate to="/home" replace />} />
-            </Routes>
+      <AuthProvider>
+        <Router>
+          <div className="app-container" style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+            <Navbar />
+            <div className="main-container" style={{ flex: 1 }}>
+              <Routes>
+                {/* Auth Routes */}
+                <Route path="/login" element={<Login />} />
+                <Route path="/login/callback" element={<LoginCallback />} />
+                
+                {/* Public Routes */}
+                <Route path="/home" element={<Home />} />
+                <Route path="/compare/:username1/:username2" element={<CompareScores />} />
+                <Route path="/compare" element={<CompareScores />} />
+                <Route path="/alt-text" element={<AltTextRatingTool />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/privacy" element={<Privacy />} />
+                <Route path="/terms" element={<Terms />} />
+                <Route path="/newsletter" element={<Newsletter />} />
+                <Route path="/supporter" element={<Supporter />} />
+                <Route path="/definitions" element={<Definitions />} />
+                <Route path="/leaderboard" element={<Leaderboard />} />
+                <Route path="/resources" element={<Resources />} />
+                <Route path="/shortcut" element={<Shortcut />} />
+                <Route path="/zen" element={<ZenPage />} />
+                <Route path="/methodology" element={<ScoringMethodology />} />
+                
+                {/* Protected Routes - Require Authentication */}
+                <Route 
+                  path="/omnifeed/:username" 
+                  element={
+                    <ProtectedRoute>
+                      <CollectionsFeed />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/omnifeed" 
+                  element={
+                    <ProtectedRoute>
+                      <CollectionsFeed />
+                    </ProtectedRoute>
+                  } 
+                />
+                
+                {/* Handle both DIDs and regular usernames */}
+                <Route path="/:username" element={<UserProfile />} />
+                
+                {/* Default routes */}
+                <Route path="/" element={<Navigate to="/home" replace />} />
+                <Route path="*" element={<Navigate to="/home" replace />} />
+              </Routes>
+            </div>
+            <Footer />
           </div>
-          <Footer />
-        </div>
-      </Router>
+        </Router>
+      </AuthProvider>
       <Analytics />
     </>
   );

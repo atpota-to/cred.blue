@@ -2,6 +2,7 @@
 import React, { useContext, useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ThemeContext } from '../../contexts/ThemeContext';
+import { useAuth } from '../../contexts/AuthContext';
 import './Navbar.css';
 
 // Dropdown Menu Component
@@ -109,6 +110,7 @@ const MenuItem = ({ title, path }) => {
 
 const Navbar = () => {
   const { isDarkMode, toggleDarkMode } = useContext(ThemeContext);
+  const { isAuthenticated, session, logout } = useAuth();
   const navigate = useNavigate();
 
   // Define dropdown menus structure
@@ -141,6 +143,27 @@ const Navbar = () => {
       { title: "methodology", path: "/methodology" },
       { title: "definitions", path: "/definitions" }
     ]
+  };
+
+  // Handle logout
+  const handleLogout = async () => {
+    await logout();
+    navigate('/');
+  };
+
+  // Get shortened display name from session
+  const getDisplayName = () => {
+    if (!session) return '';
+    
+    // Try to get the handle from the session
+    const handle = session.handle || '';
+    
+    // If it's a DID, show a shortened version
+    if (session.sub.startsWith('did:')) {
+      return session.sub.substring(0, 15) + '...';
+    }
+    
+    return handle;
   };
 
   return (
@@ -210,13 +233,36 @@ const Navbar = () => {
               <use href={`/icons/icons-sprite.svg#icon-${isDarkMode ? 'sun' : 'moon'}`} />
             </svg>
           </button>
+          
+          {/* Auth Button - Show Login or User Profile based on auth state */}
+          {isAuthenticated ? (
+            <div className="navbar-auth-container">
+              <div className="user-profile-button">
+                <span>{getDisplayName()}</span>
+                <button onClick={handleLogout} className="logout-button">
+                  Logout
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="navbar-auth-container">
+              <button
+                className="login-button"
+                type="button"
+                onClick={() => navigate('/login')}
+              >
+                login with bluesky
+              </button>
+            </div>
+          )}
+          
           <div className="navbar-support-button-container">
             <button
               className="navbar-support-button"
               type="button"
               onClick={() => navigate(`/supporter`)}
             >
-              become a supporter
+              Upgrade
             </button>
           </div>
         </div>

@@ -1,0 +1,17 @@
+{
+  "client_id": "https://cred.blue/client-metadata.json",
+  "client_name": "Cred.blue",
+  "client_uri": "https://cred.blue",
+  "redirect_uris": [
+    "https://cred.blue/login/callback",
+    "https://testing.cred.blue/login/callback",
+    "http://localhost:3000/login/callback"
+  ],
+  "logo_uri": "https://cred.blue/favicon.ico",
+  "scope": "atproto",
+  "grant_types": ["authorization_code", "refresh_token"],
+  "response_types": ["code"],
+  "token_endpoint_auth_method": "none",
+  "application_type": "web",
+  "dpop_bound_access_tokens": true
+} 

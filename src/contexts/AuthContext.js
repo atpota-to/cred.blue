@@ -86,7 +86,7 @@ export const AuthProvider = ({ children }) => {
     if (!client || !session) return;
     
     try {
-      await client.logout(session.sub);
+      await client.signOut(session.sub);
       setSession(null);
     } catch (err) {
       console.error('Logout failed:', err);

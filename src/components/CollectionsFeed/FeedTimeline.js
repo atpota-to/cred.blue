@@ -394,7 +394,7 @@ const FeedTimeline = ({ records, serviceEndpoint }) => {
                     <span>Record Data</span>
                     <button 
                       className="copy-json-button"
-                      onClick={() => {
+                      onClick={(event) => {
                         navigator.clipboard.writeText(JSON.stringify(modalData, null, 2));
                         // Show temporary success message
                         const button = event.currentTarget;
@@ -422,7 +422,7 @@ const FeedTimeline = ({ records, serviceEndpoint }) => {
                 <span>URI: {selectedRecord.uri}</span>
                 <button 
                   className="copy-button"
-                  onClick={() => {
+                  onClick={(event) => {
                     navigator.clipboard.writeText(selectedRecord.uri);
                     // Show temporary success message
                     const button = event.currentTarget;

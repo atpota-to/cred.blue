@@ -633,7 +633,7 @@ const CollectionsFeed = () => {
                     <span>DID: {did}</span>
                     <button 
                       className="copy-button"
-                      onClick={() => {
+                      onClick={(event) => {
                         navigator.clipboard.writeText(did);
                         // Show temporary success message
                         const button = event.currentTarget;
@@ -654,7 +654,7 @@ const CollectionsFeed = () => {
                     <span>Service: {serviceEndpoint}</span>
                     <button 
                       className="copy-button"
-                      onClick={() => {
+                      onClick={(event) => {
                         navigator.clipboard.writeText(serviceEndpoint);
                         // Show temporary success message
                         const button = event.currentTarget;

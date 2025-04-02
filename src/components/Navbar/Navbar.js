@@ -116,12 +116,20 @@ const Navbar = () => {
     title: "score",
     path: "/",
     items: [
-      { title: "score", path: "/" },
+      { title: "generate", path: "/" },
       { title: "compare", path: "/compare" },
       { title: "leaderboard", path: "/leaderboard" },
-      { title: "alt text rating", path: "/alt-text" },
-      { title: "activity feed", path: "/collections-feed" },
       { title: "shortcut", path: "/shortcut" }
+    ]
+  };
+
+  const resourcesDropdown = {
+    title: "resources",
+    path: "/resources",
+    items: [
+      { title: "library", path: "/resources" },
+      { title: "alt text rating", path: "/alt-text" },
+      { title: "omnifeed", path: "/omnifeed" }
     ]
   };
 
@@ -153,7 +161,7 @@ const Navbar = () => {
             <ul>
               <DropdownMenu {...scoreDropdown} />
               <DropdownMenu {...aboutDropdown} />
-              <MenuItem title="resources" path="/resources" />
+              <DropdownMenu {...resourcesDropdown} />
             </ul>
           </nav>
         </div>

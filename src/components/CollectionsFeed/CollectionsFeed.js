@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import SearchBar from '../SearchBar/SearchBar';
 import FeedTimeline from './FeedTimeline';
-import './CollectionsFeed.css';
+import './CollectionsFeed.css'; // Renamed to Omnifeed.css but keeping same filename for compatibility
 import { resolveHandleToDid, getServiceEndpointForDid } from '../../accountData';
 import MatterLoadingAnimation from '../MatterLoadingAnimation';
 import { Helmet } from 'react-helmet';
@@ -35,6 +35,14 @@ const CollectionsFeed = () => {
     }
   }, [username]);
   
+  // Effect to watch for selected collections changes
+  useEffect(() => {
+    if (selectedCollections.length > 0 && did && serviceEndpoint && searchPerformed) {
+      // Refresh records when filters change, but not during initial load
+      fetchCollectionRecords(did, serviceEndpoint, selectedCollections);
+    }
+  }, [selectedCollections]);
+  
   // Function to load user data
   const loadUserData = async (userHandle) => {
     try {
@@ -43,7 +51,7 @@ const CollectionsFeed = () => {
       
       // Update URL with the username
       if (userHandle !== username) {
-        navigate(`/collections-feed/${encodeURIComponent(userHandle)}`);
+        navigate(`/omnifeed/${encodeURIComponent(userHandle)}`);
       }
       
       // Resolve handle to DID
@@ -269,16 +277,21 @@ const CollectionsFeed = () => {
     } else {
       setSelectedCollections(prev => [...prev, collection]);
     }
+    // We don't need to manually refresh here since we added a useEffect hook
+    // that watches for changes to selectedCollections
   };
   
   // Select all collections
   const selectAllCollections = () => {
     setSelectedCollections([...collections]);
+    // We don't need to manually refresh here since we added a useEffect hook
+    // that watches for changes to selectedCollections
   };
   
   // Deselect all collections
   const deselectAllCollections = () => {
     setSelectedCollections([]);
+    // No need to refresh as we'll show "no collections selected" message
   };
   
   // Handle refresh button click
@@ -313,13 +326,13 @@ const CollectionsFeed = () => {
   return (
     <div className="collections-feed-container">
       <Helmet>
-        <title>{username ? `${username}'s Collections Feed` : 'Collections Feed'}</title>
+        <title>{username ? `${username}'s Omnifeed` : 'Omnifeed'}</title>
         <meta name="description" content={username ? `View ${username}'s AT Protocol collection records in chronological order` : 'View AT Protocol collection records in chronological order'} />
       </Helmet>
       
       {initialLoad && !username ? (
         <div className="search-container">
-          <h1>Collections Feed</h1>
+          <h1>Omnifeed</h1>
           <p className="intro-text">
             Enter a Bluesky handle to see their AT Protocol collection records in chronological order.
           </p>
@@ -353,7 +366,7 @@ const CollectionsFeed = () => {
               <p className="error-message">{error}</p>
               <button 
                 className="try-again-button"
-                onClick={() => navigate('/collections-feed')}
+                onClick={() => navigate('/omnifeed')}
               >
                 Try Another Account
               </button>
@@ -456,21 +469,55 @@ const CollectionsFeed = () => {
                       type="checkbox"
                       checked={useRkeyTimestamp}
                       onChange={() => {
-                        // When toggling, we need to re-sort the records
-                        setUseRkeyTimestamp(!useRkeyTimestamp);
-                        // Re-filter and re-sort the records with the new setting
-                        const sorted = [...records].filter(record => {
-                          if (!useRkeyTimestamp) { // We're switching to rkey timestamps
-                            return record.rkeyTimestamp !== null;
-                          } else { // We're switching to content timestamps
-                            return record.contentTimestamp !== null;
-                          }
-                        }).sort((a, b) => {
-                          const aTime = !useRkeyTimestamp ? a.rkeyTimestamp : a.contentTimestamp;
-                          const bTime = !useRkeyTimestamp ? b.rkeyTimestamp : b.contentTimestamp;
-                          return new Date(bTime) - new Date(aTime);
-                        });
-                        setRecords(sorted);
+                        // Toggle the timestamp mode
+                        const newTimestampMode = !useRkeyTimestamp;
+                        setUseRkeyTimestamp(newTimestampMode);
+                        
+                        // Refresh the feed with the new timestamp setting
+                        if (did && serviceEndpoint && selectedCollections.length > 0) {
+                          // We need to refetch to ensure we get all records
+                          // Store the current mode for fetchCollectionRecords
+                          const currentMode = useRkeyTimestamp;
+                          
+                          // Temporarily reset records for the loading state
+                          const currentRecords = [...records];
+                          setRecords([]);
+                          setLoading(true);
+                          
+                          // Fetch new records with the current selection
+                          fetchCollectionRecords(did, serviceEndpoint, selectedCollections)
+                            .catch(err => {
+                              console.error("Error refreshing with new timestamp mode:", err);
+                              // Restore the previous records and sort them
+                              const sorted = [...currentRecords].filter(record => {
+                                if (newTimestampMode) { // We're switching to rkey timestamps
+                                  return record.rkeyTimestamp !== null;
+                                } else { // We're switching to content timestamps
+                                  return record.contentTimestamp !== null;
+                                }
+                              }).sort((a, b) => {
+                                const aTime = newTimestampMode ? a.rkeyTimestamp : a.contentTimestamp;
+                                const bTime = newTimestampMode ? b.rkeyTimestamp : b.contentTimestamp;
+                                return new Date(bTime) - new Date(aTime);
+                              });
+                              setRecords(sorted);
+                              setLoading(false);
+                            });
+                        } else {
+                          // If we can't refetch, just resort the existing records
+                          const sorted = [...records].filter(record => {
+                            if (newTimestampMode) { // We're switching to rkey timestamps
+                              return record.rkeyTimestamp !== null;
+                            } else { // We're switching to content timestamps
+                              return record.contentTimestamp !== null;
+                            }
+                          }).sort((a, b) => {
+                            const aTime = newTimestampMode ? a.rkeyTimestamp : a.contentTimestamp;
+                            const bTime = newTimestampMode ? b.rkeyTimestamp : b.contentTimestamp;
+                            return new Date(bTime) - new Date(aTime);
+                          });
+                          setRecords(sorted);
+                        }
                       }}
                     />
                     Use Record Key Timestamps

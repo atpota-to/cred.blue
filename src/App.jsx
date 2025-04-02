@@ -34,8 +34,8 @@ const App = () => {
               <Route path="/home" element={<Home />} />
               <Route path="/compare/:username1/:username2" element={<CompareScores />} />
               <Route path="/compare" element={<CompareScores />} />
-              <Route path="/collections-feed/:username" element={<CollectionsFeed />} />
-              <Route path="/collections-feed" element={<CollectionsFeed />} />
+              <Route path="/omnifeed/:username" element={<CollectionsFeed />} />
+              <Route path="/omnifeed" element={<CollectionsFeed />} />
               <Route path="/alt-text" element={<AltTextRatingTool />} />
               <Route path="/about" element={<About />} />
               <Route path="/privacy" element={<Privacy />} />

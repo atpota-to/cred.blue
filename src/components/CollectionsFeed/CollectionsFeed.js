@@ -30,6 +30,7 @@ const CollectionsFeed = () => {
   const [searchPerformed, setSearchPerformed] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [useRkeyTimestamp, setUseRkeyTimestamp] = useState(false);
+  const [compactView, setCompactView] = useState(false);
   
   // Effect to load data if username is provided in URL
   useEffect(() => {
@@ -844,66 +845,82 @@ const CollectionsFeed = () => {
               </div>
               
               <div className="feed-filters">
-                <div className="timestamp-toggle">
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={useRkeyTimestamp}
-                      onChange={() => {
-                        // Toggle the timestamp mode
-                        const newTimestampMode = !useRkeyTimestamp;
-                        setUseRkeyTimestamp(newTimestampMode);
-                        
-                        // Refresh the feed with the new timestamp setting
-                        if (did && serviceEndpoint && selectedCollections.length > 0) {
-                          // We need to refetch to ensure we get all records
-                          // Store the current mode for fetchCollectionRecords
-                          const currentMode = useRkeyTimestamp;
+                <div className="toggle-container">
+                  <div className="timestamp-toggle">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={useRkeyTimestamp}
+                        onChange={() => {
+                          // Toggle the timestamp mode
+                          const newTimestampMode = !useRkeyTimestamp;
+                          setUseRkeyTimestamp(newTimestampMode);
                           
-                          // Temporarily reset records for the loading state
-                          const currentRecords = [...records];
-                          setRecords([]);
-                          setLoading(true);
-                          
-                          // Fetch new records with the current selection
-                          fetchCollectionRecords(did, serviceEndpoint, selectedCollections)
-                            .catch(err => {
-                              console.error("Error refreshing with new timestamp mode:", err);
-                              // Restore the previous records and sort them
-                              const sorted = [...currentRecords].filter(record => {
-                                if (newTimestampMode) { // We're switching to rkey timestamps
-                                  return record.rkeyTimestamp !== null;
-                                } else { // We're switching to content timestamps
-                                  return record.contentTimestamp !== null;
-                                }
-                              }).sort((a, b) => {
-                                const aTime = newTimestampMode ? a.rkeyTimestamp : a.contentTimestamp;
-                                const bTime = newTimestampMode ? b.rkeyTimestamp : b.contentTimestamp;
-                                return new Date(bTime) - new Date(aTime);
+                          // Refresh the feed with the new timestamp setting
+                          if (did && serviceEndpoint && selectedCollections.length > 0) {
+                            // We need to refetch to ensure we get all records
+                            // Store the current mode for fetchCollectionRecords
+                            const currentMode = useRkeyTimestamp;
+                            
+                            // Temporarily reset records for the loading state
+                            const currentRecords = [...records];
+                            setRecords([]);
+                            setLoading(true);
+                            
+                            // Fetch new records with the current selection
+                            fetchCollectionRecords(did, serviceEndpoint, selectedCollections)
+                              .catch(err => {
+                                console.error("Error refreshing with new timestamp mode:", err);
+                                // Restore the previous records and sort them
+                                const sorted = [...currentRecords].filter(record => {
+                                  if (newTimestampMode) { // We're switching to rkey timestamps
+                                    return record.rkeyTimestamp !== null;
+                                  } else { // We're switching to content timestamps
+                                    return record.contentTimestamp !== null;
+                                  }
+                                }).sort((a, b) => {
+                                  const aTime = newTimestampMode ? a.rkeyTimestamp : a.contentTimestamp;
+                                  const bTime = newTimestampMode ? b.rkeyTimestamp : b.contentTimestamp;
+                                  return new Date(bTime) - new Date(aTime);
+                                });
+                                setRecords(sorted);
+                                setLoading(false);
                               });
-                              setRecords(sorted);
-                              setLoading(false);
+                          } else {
+                            // If we can't refetch, just resort the existing records
+                            const sorted = [...records].filter(record => {
+                              if (newTimestampMode) { // We're switching to rkey timestamps
+                                return record.rkeyTimestamp !== null;
+                              } else { // We're switching to content timestamps
+                                return record.contentTimestamp !== null;
+                              }
+                            }).sort((a, b) => {
+                              const aTime = newTimestampMode ? a.rkeyTimestamp : a.contentTimestamp;
+                              const bTime = newTimestampMode ? b.rkeyTimestamp : b.contentTimestamp;
+                              return new Date(bTime) - new Date(aTime);
                             });
-                        } else {
-                          // If we can't refetch, just resort the existing records
-                          const sorted = [...records].filter(record => {
-                            if (newTimestampMode) { // We're switching to rkey timestamps
-                              return record.rkeyTimestamp !== null;
-                            } else { // We're switching to content timestamps
-                              return record.contentTimestamp !== null;
-                            }
-                          }).sort((a, b) => {
-                            const aTime = newTimestampMode ? a.rkeyTimestamp : a.contentTimestamp;
-                            const bTime = newTimestampMode ? b.rkeyTimestamp : b.contentTimestamp;
-                            return new Date(bTime) - new Date(aTime);
-                          });
-                          setRecords(sorted);
-                        }
-                      }}
-                    />
-                    Use Record Key Timestamps
-                  </label>
-                  <span title="Record keys in AT Protocol encode creation timestamps which can differ from timestamps in the record content.">ⓘ</span>
+                            setRecords(sorted);
+                          }
+                        }}
+                      />
+                      Use Record Key Timestamps
+                    </label>
+                    <span title="Record keys in AT Protocol encode creation timestamps which can differ from timestamps in the record content.">ⓘ</span>
+                  </div>
+                  
+                  <div className="view-toggle">
+                    <div className="toggle-switch-container">
+                      <label className="switch">
+                        <input
+                          type="checkbox"
+                          checked={compactView}
+                          onChange={() => setCompactView(!compactView)}
+                        />
+                        <span className="slider round"></span>
+                        <span className="toggle-label">{compactView ? 'Compact View' : 'Standard View'}</span>
+                      </label>
+                    </div>
+                  </div>
                 </div>
               </div>
               
@@ -916,6 +933,7 @@ const CollectionsFeed = () => {
                   <FeedTimeline 
                     records={filteredRecords} 
                     serviceEndpoint={serviceEndpoint}
+                    compactView={compactView}
                   />
                   
                   {filteredRecords.length === 0 && (

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import './FeedTimeline.css';
 import { formatDistanceToNow } from 'date-fns';
 
-const FeedTimeline = ({ records, serviceEndpoint }) => {
+const FeedTimeline = ({ records, serviceEndpoint, compactView = false }) => {
   // Define all hooks at the top level, before any conditionals
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [modalData, setModalData] = useState(null);
@@ -245,129 +245,215 @@ const FeedTimeline = ({ records, serviceEndpoint }) => {
   };
 
   return (
-    <div className="feed-timeline">
-      {records.map((record, index) => {
-        const content = getRecordContent(record);
-        
-        return (
-          <div 
-            key={`${record.collection}-${record.rkey}-${index}`} 
-            className={`feed-item ${record.collection.startsWith('app.bsky.') ? 'bsky-item' : 'atproto-item'}`}
-          >
-            <div className="feed-item-header">
-              <div className="collection-type">
-                <span 
-                  className={`collection-name ${record.collection.startsWith('app.bsky.') ? 'bsky-collection' : 'atproto-collection'}`}
-                >
-                  {record.collection.split('.').pop()}
-                </span>
-                <span className="collection-full">{record.collection}</span>
-              </div>
-              <div 
-                className="record-rkey record-key-link" 
-                onClick={() => openModal(record)}
-              >
-                {record.rkey}
-              </div>
-            </div>
-            
-            <div className="feed-item-content">
-              {record.value && record.value.$type && (
-                <div className="record-type">
-                  <span className="type-label">Type:</span> {record.value.$type}
-                  {content && content.isReply && (
-                    <span className="post-type-badge post-type-reply">Reply</span>
-                  )}
-                  {content && content.isQuote && (
-                    <span className="post-type-badge post-type-quote">Quote</span>
-                  )}
-                </div>
-              )}
+    <div className={`feed-timeline ${compactView ? 'compact-view' : ''}`}>
+      {compactView ? (
+        // Compact view - simpler list format
+        <table className="compact-records-table">
+          <thead>
+            <tr>
+              <th className="collection-col">Collection</th>
+              <th className="time-col">Time</th>
+              <th className="type-col">Type</th>
+              <th className="content-col">Content</th>
+              <th className="actions-col">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {records.map((record, index) => {
+              const content = getRecordContent(record);
+              const timestamp = record.contentTimestamp || record.rkeyTimestamp;
+              const viewUrl = content?.selfBskyUrl || content?.bskyUrl || null;
               
-              {content && (
-                <div className="record-content">
-                  <span className="content-label">{content.label}:</span>
-                  {content.subjectUri ? (
-                    <span 
-                      className="record-link"
-                      onClick={() => fetchRelatedRecord(content.subjectUri)}
-                    >
-                      {content.content}
+              return (
+                <tr 
+                  key={`${record.collection}-${record.rkey}-${index}`}
+                  className={record.collection.startsWith('app.bsky.') ? 'bsky-row' : 'atproto-row'}
+                >
+                  <td className="collection-col">
+                    <span className="compact-collection">{record.collection.split('.').pop()}</span>
+                  </td>
+                  <td className="time-col">
+                    <span className="compact-time">{formatRelativeTime(timestamp)}</span>
+                  </td>
+                  <td className="type-col">
+                    <span className="compact-type">
+                      {record.collectionType ? record.collectionType.split('.').pop() : '—'}
+                      {content?.isReply && <span className="mini-badge reply-badge">R</span>}
+                      {content?.isQuote && <span className="mini-badge quote-badge">Q</span>}
                     </span>
-                  ) : (
-                    <span>{content.content}</span>
-                  )}
-                  
-                  {/* Show Bluesky links for either the record itself or its subject */}
-                  <div className="bsky-link-container">
-                    {content.bskyUrl && (
-                      <a 
-                        href={content.bskyUrl} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="bsky-link"
+                  </td>
+                  <td className="content-col">
+                    <span className="compact-content" onClick={() => openModal(record)}>
+                      {content ? (
+                        content.subjectUri ? (
+                          <span className="record-link-compact" onClick={(e) => {
+                            e.stopPropagation();
+                            fetchRelatedRecord(content.subjectUri);
+                          }}>
+                            {content.content}
+                          </span>
+                        ) : content.content
+                      ) : record.rkey}
+                    </span>
+                  </td>
+                  <td className="actions-col">
+                    <div className="compact-actions">
+                      <button 
+                        className="compact-view-json" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openModal(record);
+                        }}
+                        title="View JSON"
                       >
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M8 0L14.9282 4V12L8 16L1.0718 12V4L8 0Z" fill="#0085ff"/>
-                        </svg>
-                        <span className="bsky-link-text">View on Bluesky (Referenced Content)</span>
-                      </a>
+                        { }
+                      </button>
+                      {viewUrl && (
+                        <a 
+                          href={viewUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="compact-bsky-link"
+                          title="View on Bluesky"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M8 0L14.9282 4V12L8 16L1.0718 12V4L8 0Z" fill="#0085ff"/>
+                          </svg>
+                        </a>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      ) : (
+        // Standard view - original card format
+        records.map((record, index) => {
+          const content = getRecordContent(record);
+          
+          return (
+            <div 
+              key={`${record.collection}-${record.rkey}-${index}`} 
+              className={`feed-item ${record.collection.startsWith('app.bsky.') ? 'bsky-item' : 'atproto-item'}`}
+            >
+              <div className="feed-item-header">
+                <div className="collection-type">
+                  <span 
+                    className={`collection-name ${record.collection.startsWith('app.bsky.') ? 'bsky-collection' : 'atproto-collection'}`}
+                  >
+                    {record.collection.split('.').pop()}
+                  </span>
+                  <span className="collection-full">{record.collection}</span>
+                </div>
+                <div 
+                  className="record-rkey record-key-link" 
+                  onClick={() => openModal(record)}
+                >
+                  {record.rkey}
+                </div>
+              </div>
+              
+              <div className="feed-item-content">
+                {record.value && record.value.$type && (
+                  <div className="record-type">
+                    <span className="type-label">Type:</span> {record.value.$type}
+                    {content && content.isReply && (
+                      <span className="post-type-badge post-type-reply">Reply</span>
                     )}
-                    
-                    {content.replyParentUrl && (
-                      <a 
-                        href={content.replyParentUrl} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="bsky-link"
-                      >
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M8 0L14.9282 4V12L8 16L1.0718 12V4L8 0Z" fill="#0085ff"/>
-                        </svg>
-                        <span className="bsky-link-text">View Parent Post on Bluesky</span>
-                      </a>
-                    )}
-                    
-                    {content.quotedUrl && (
-                      <a 
-                        href={content.quotedUrl} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="bsky-link"
-                      >
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M8 0L14.9282 4V12L8 16L1.0718 12V4L8 0Z" fill="#0085ff"/>
-                        </svg>
-                        <span className="bsky-link-text">View Quoted Post on Bluesky</span>
-                      </a>
-                    )}
-                    
-                    {content.selfBskyUrl && !content.bskyUrl && !content.replyParentUrl && !content.quotedUrl && (
-                      <a 
-                        href={content.selfBskyUrl} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="bsky-link"
-                      >
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M8 0L14.9282 4V12L8 16L1.0718 12V4L8 0Z" fill="#0085ff"/>
-                        </svg>
-                        <span className="bsky-link-text">View on Bluesky</span>
-                      </a>
+                    {content && content.isQuote && (
+                      <span className="post-type-badge post-type-quote">Quote</span>
                     )}
                   </div>
+                )}
+                
+                {content && (
+                  <div className="record-content">
+                    <span className="content-label">{content.label}:</span>
+                    {content.subjectUri ? (
+                      <span 
+                        className="record-link"
+                        onClick={() => fetchRelatedRecord(content.subjectUri)}
+                      >
+                        {content.content}
+                      </span>
+                    ) : (
+                      <span>{content.content}</span>
+                    )}
+                    
+                    {/* Show Bluesky links for either the record itself or its subject */}
+                    <div className="bsky-link-container">
+                      {content.bskyUrl && (
+                        <a 
+                          href={content.bskyUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="bsky-link"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M8 0L14.9282 4V12L8 16L1.0718 12V4L8 0Z" fill="#0085ff"/>
+                          </svg>
+                          <span className="bsky-link-text">View on Bluesky (Referenced Content)</span>
+                        </a>
+                      )}
+                      
+                      {content.replyParentUrl && (
+                        <a 
+                          href={content.replyParentUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="bsky-link"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M8 0L14.9282 4V12L8 16L1.0718 12V4L8 0Z" fill="#0085ff"/>
+                          </svg>
+                          <span className="bsky-link-text">View Parent Post on Bluesky</span>
+                        </a>
+                      )}
+                      
+                      {content.quotedUrl && (
+                        <a 
+                          href={content.quotedUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="bsky-link"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M8 0L14.9282 4V12L8 16L1.0718 12V4L8 0Z" fill="#0085ff"/>
+                          </svg>
+                          <span className="bsky-link-text">View Quoted Post on Bluesky</span>
+                        </a>
+                      )}
+                      
+                      {content.selfBskyUrl && !content.bskyUrl && !content.replyParentUrl && !content.quotedUrl && (
+                        <a 
+                          href={content.selfBskyUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="bsky-link"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M8 0L14.9282 4V12L8 16L1.0718 12V4L8 0Z" fill="#0085ff"/>
+                          </svg>
+                          <span className="bsky-link-text">View on Bluesky</span>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              <div className="feed-item-footer">
+                <div className="record-timestamp">
+                  {formatRelativeTime(record.contentTimestamp || record.rkeyTimestamp)}
                 </div>
-              )}
-            </div>
-            
-            <div className="feed-item-footer">
-              <div className="record-timestamp">
-                {formatRelativeTime(record.contentTimestamp || record.rkeyTimestamp)}
               </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })
+      )}
       
       {selectedRecord && (
         <div className="record-modal-backdrop" onClick={closeModal}>

@@ -368,7 +368,7 @@ const CollectionsFeed = () => {
               <div className="feed-controls">
                 <div className="filter-container">
                   <div 
-                    className="dropdown-toggle"
+                    className="filter-dropdown-toggle"
                     onClick={() => setDropdownOpen(!dropdownOpen)}
                   >
                     <span>
@@ -383,10 +383,10 @@ const CollectionsFeed = () => {
                   </div>
                   
                   {dropdownOpen && (
-                    <div className="dropdown-backdrop open" onClick={() => setDropdownOpen(false)} />
+                    <div className="filter-dropdown-backdrop open" onClick={() => setDropdownOpen(false)} />
                   )}
                   
-                  <div className={`dropdown-menu ${dropdownOpen ? 'open' : ''}`}>
+                  <div className={`filter-dropdown-menu ${dropdownOpen ? 'open' : ''}`}>
                     <div className="filter-header">
                       <h3>Select Collections</h3>
                       <div className="filter-actions">

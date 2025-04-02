@@ -21,7 +21,7 @@ ChartJS.register(
   Legend
 );
 
-const ActivityChart = ({ records, collections }) => {
+const ActivityChart = ({ records, collections, loading = false }) => {
   const [timePeriod, setTimePeriod] = useState('7days');
   const [chartData, setChartData] = useState({
     labels: [],
@@ -312,6 +312,19 @@ const ActivityChart = ({ records, collections }) => {
       }
     }
   };
+  
+  // Show loading state when fetching records deeply
+  if (loading) {
+    return (
+      <div className="activity-chart-container">
+        <div className="activity-chart-loading">
+          <div className="chart-loading-spinner"></div>
+          <p>Loading record data for visualization...</p>
+          <p className="chart-loading-note">This may take a moment for accounts with many records</p>
+        </div>
+      </div>
+    );
+  }
   
   // Ensure records array exists and has items
   if (!records || records.length === 0) {

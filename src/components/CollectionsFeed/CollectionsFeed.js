@@ -23,6 +23,7 @@ const CollectionsFeed = () => {
   const [allRecordsForChart, setAllRecordsForChart] = useState([]); // All records for chart visualization
   const [loading, setLoading] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
+  const [chartLoading, setChartLoading] = useState(false); // Separate loading state for chart data
   const [error, setError] = useState('');
   const [collectionCursors, setCollectionCursors] = useState({});
   const [fetchingMore, setFetchingMore] = useState(false);
@@ -181,99 +182,180 @@ const CollectionsFeed = () => {
       
       // Array to store all fetched records
       let allRecords = isLoadMore ? [...records] : [];
+      let allChartRecords = isLoadMore ? [...allRecordsForChart] : [];
       const newCursors = { ...collectionCursors };
       
       // Calculate a cutoff date (90 days ago by default for chart visualization)
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - 90); // 3 months
       
-      // Fetch records for each collection in parallel
-      const fetchPromises = collectionsList.map(async (collection) => {
-        // Fetch up to 100 records per collection to ensure we get a good sample
-        let url = `${endpoint}/xrpc/com.atproto.repo.listRecords?repo=${encodeURIComponent(userDid)}&collection=${encodeURIComponent(collection)}&limit=100`;
+      // Track if this is the initial load for charting purposes
+      const isInitialLoad = !isLoadMore && allRecordsForChart.length === 0;
+      
+      // Set chart loading state if we're doing deep pagination for the chart
+      if (isInitialLoad) {
+        setChartLoading(true);
+      }
+      
+      // Fetch records for each collection
+      for (const collection of collectionsList) {
+        let hasMoreRecords = true;
+        let cursor = isLoadMore ? newCursors[collection] : null;
+        let pageCount = 0;
+        let collectionRecords = [];
+        let reachedCutoff = false;
         
-        // Add cursor if loading more and we have a cursor for this collection
-        if (isLoadMore && newCursors[collection]) {
-          url += `&cursor=${encodeURIComponent(newCursors[collection])}`;
+        // For initial load, we need to do deep pagination to get all data for charting
+        // For load more, we just get the next page
+        const maxPages = isInitialLoad ? 50 : 1; // Limit for safety
+        
+        while (hasMoreRecords && pageCount < maxPages && !reachedCutoff) {
+          // Fetch up to 100 records per page
+          let url = `${endpoint}/xrpc/com.atproto.repo.listRecords?repo=${encodeURIComponent(userDid)}&collection=${encodeURIComponent(collection)}&limit=100`;
+          
+          // Add cursor if we have one
+          if (cursor) {
+            url += `&cursor=${encodeURIComponent(cursor)}`;
+          }
+          
+          console.log(`Fetching ${collection} page ${pageCount + 1}${cursor ? ' with cursor' : ''}`);
+          
+          const response = await fetch(url);
+          
+          if (!response.ok) {
+            console.error(`Error fetching records for ${collection}: ${response.statusText}`);
+            break;
+          }
+          
+          const data = await response.json();
+          pageCount++;
+          
+          // Process records from this page
+          if (data.records && data.records.length > 0) {
+            const processedRecords = data.records.map(record => {
+              const contentTimestamp = extractTimestamp(record);
+              const rkey = record.uri.split('/').pop();
+              const rkeyTimestamp = tidToTimestamp(rkey);
+              
+              return {
+                ...record,
+                collection,
+                collectionType: record.value?.$type || collection,
+                contentTimestamp,
+                rkeyTimestamp,
+                rkey,
+              };
+            });
+            
+            // Check if we've reached older records
+            if (isInitialLoad) {
+              // For chart data, determine if any records are beyond our cutoff
+              const oldestRecordTime = processedRecords.reduce((oldest, record) => {
+                const timestamp = record.contentTimestamp || record.rkeyTimestamp;
+                if (!timestamp) return oldest;
+                
+                const recordTime = new Date(timestamp).getTime();
+                return recordTime < oldest ? recordTime : oldest;
+              }, Date.now());
+              
+              // If the oldest record on this page is older than our cutoff, we can stop
+              if (oldestRecordTime < cutoffDate.getTime()) {
+                reachedCutoff = true;
+                console.log(`Reached cutoff date for ${collection} on page ${pageCount}`);
+                
+                // Filter records from this page to only include those after cutoff
+                const filteredRecords = processedRecords.filter(record => {
+                  const timestamp = record.contentTimestamp || record.rkeyTimestamp;
+                  if (!timestamp) return false;
+                  return new Date(timestamp) >= cutoffDate;
+                });
+                
+                collectionRecords.push(...filteredRecords);
+              } else {
+                // All records on this page are within our date range
+                collectionRecords.push(...processedRecords);
+              }
+            } else {
+              // For regular timeline browsing, just add all records
+              collectionRecords.push(...processedRecords);
+            }
+          }
+          
+          // Check if there are more pages
+          if (data.cursor) {
+            cursor = data.cursor;
+          } else {
+            hasMoreRecords = false;
+          }
+          
+          // If we're not doing initial load for chart, break after first page
+          if (!isInitialLoad) {
+            break;
+          }
         }
         
-        const response = await fetch(url);
-        
-        if (!response.ok) {
-          console.error(`Error fetching records for ${collection}: ${response.statusText}`);
-          return [];
-        }
-        
-        const data = await response.json();
-        
-        // Save cursor for next pagination
-        if (data.cursor) {
-          newCursors[collection] = data.cursor;
+        // Save the cursor for this collection for future pagination
+        if (cursor) {
+          newCursors[collection] = cursor;
         } else {
           // No more records for this collection
           delete newCursors[collection];
         }
         
-        // Process and format records
-        return data.records.map(record => {
-          const contentTimestamp = extractTimestamp(record);
-          const rkey = record.uri.split('/').pop();
-          const rkeyTimestamp = tidToTimestamp(rkey);
-          
-          return {
-            ...record,
-            collection,
-            collectionType: record.value?.$type || collection,
-            contentTimestamp,
-            rkeyTimestamp,
-            // We'll decide which timestamp to use when filtering/sorting
-            rkey,
-          };
-        });
-      });
-      
-      // Wait for all fetch operations to complete
-      const collectionRecords = await Promise.all(fetchPromises);
-      
-      // Combine and flatten records from all collections
-      collectionRecords.forEach(records => {
-        allRecords = [...allRecords, ...records];
-      });
-      
-      // Filter and sort records based on the selected timestamp source
-      allRecords = allRecords.filter(record => {
-        if (useRkeyTimestamp) {
-          // When using rkey timestamps, include all records (all valid TIDs should have timestamps)
-          return record.rkeyTimestamp !== null;
+        // Add this collection's records to our overall array
+        if (isInitialLoad) {
+          // For chart initialization, add all records to chart data
+          allChartRecords = [...allChartRecords, ...collectionRecords];
+        } else if (isLoadMore) {
+          // For load more, only add to both arrays if within display limit
+          allChartRecords = [...allChartRecords, ...collectionRecords];
+          allRecords = [...allRecords, ...collectionRecords];
         } else {
-          // When using content timestamps, only include records with valid content timestamps
-          return record.contentTimestamp !== null;
+          // For regular display, add to both
+          allChartRecords = [...allChartRecords, ...collectionRecords];
+          allRecords = [...allRecords, ...collectionRecords];
         }
-      }).sort((a, b) => {
-        // Sort based on the selected timestamp type
-        const aTime = useRkeyTimestamp ? a.rkeyTimestamp : a.contentTimestamp;
-        const bTime = useRkeyTimestamp ? b.rkeyTimestamp : b.contentTimestamp;
-        
-        return new Date(bTime) - new Date(aTime); // Newest first
-      });
-      
-      // We'll keep all records for charting purposes, but only show the most recent ones in the timeline
-      const chartRecords = [...allRecords];
-      
-      // If not loading more, limit to 20 most recent records for initial display in timeline
-      if (!isLoadMore) {
-        allRecords = allRecords.slice(0, 20);
       }
       
-      // Update state with both the display records and the full set for charting
-      setRecords(allRecords);
-      setAllRecordsForChart(prev => isLoadMore ? [...prev, ...chartRecords] : chartRecords);
+      // Filter and sort all records based on the selected timestamp source
+      const filteredChartRecords = allChartRecords.filter(record => {
+        if (useRkeyTimestamp) {
+          return record.rkeyTimestamp !== null;
+        } else {
+          return record.contentTimestamp !== null;
+        }
+      });
+      
+      // Sort by timestamp (newest first)
+      const sortedChartRecords = [...filteredChartRecords].sort((a, b) => {
+        const aTime = useRkeyTimestamp ? a.rkeyTimestamp : a.contentTimestamp;
+        const bTime = useRkeyTimestamp ? b.rkeyTimestamp : b.contentTimestamp;
+        return new Date(bTime) - new Date(aTime);
+      });
+      
+      // For timeline display, limit records to most recent ones
+      let displayRecords = [...sortedChartRecords];
+      if (!isLoadMore) {
+        displayRecords = displayRecords.slice(0, 20);
+      }
+      
+      console.log(`Fetched total of ${sortedChartRecords.length} records for chart, displaying ${displayRecords.length}`);
+      
+      // Update state
+      setRecords(displayRecords);
+      setAllRecordsForChart(sortedChartRecords);
       setCollectionCursors(newCursors);
       setFetchingMore(false);
+      
+      // Turn off chart loading if it was on
+      if (chartLoading) {
+        setChartLoading(false);
+      }
     } catch (err) {
       console.error('Error fetching collection records:', err);
       setError('Failed to fetch records. Please try again.');
       setFetchingMore(false);
+      setChartLoading(false); // Make sure we turn off chart loading on error
     }
   };
   
@@ -392,6 +474,7 @@ const CollectionsFeed = () => {
               <ActivityChart 
                 records={allRecordsForChart} 
                 collections={collections}
+                loading={chartLoading}
               />
               
               <div className="feed-controls">

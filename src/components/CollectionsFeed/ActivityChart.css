@@ -13,7 +13,10 @@
   justify-content: center;
   margin-bottom: 15px;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
+  max-width: 90%;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .time-period-button {
@@ -21,10 +24,13 @@
   color: var(--text);
   border: 1px solid var(--card-border);
   border-radius: 4px;
-  padding: 8px 12px;
-  font-size: 0.9rem;
+  padding: 8px 10px;
+  font-size: 0.85rem;
   cursor: pointer;
   transition: all 0.2s ease;
+  flex: 1;
+  min-width: 90px;
+  white-space: nowrap;
 }
 
 .time-period-button:hover {

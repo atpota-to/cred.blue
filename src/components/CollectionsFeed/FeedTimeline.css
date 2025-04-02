@@ -187,6 +187,32 @@
     text-decoration: underline;
   }
   
+  .bsky-link {
+    display: block;
+    margin-top: 8px;
+    color: var(--button-bg);
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: opacity 0.2s;
+  }
+  
+  .bsky-link:hover {
+    opacity: 0.8;
+  }
+  
+  .bsky-link svg {
+    margin-right: 5px;
+    vertical-align: middle;
+  }
+  
+  .bsky-link-text {
+    vertical-align: middle;
+  }
+  
+  .bsky-link-container {
+    margin-top: 8px;
+  }
+  
   .record-json {
     background-color: var(--background);
     border-radius: 5px;

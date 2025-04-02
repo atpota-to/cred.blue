@@ -238,6 +238,33 @@
     margin-left: 8px;
   }
   
+  .feed-filters {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+  }
+  
+  .timestamp-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-right: 15px;
+  }
+  
+  .timestamp-toggle label {
+    font-size: 0.9rem;
+    color: var(--text);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+  }
+  
+  .timestamp-toggle input[type="checkbox"] {
+    margin-right: 5px;
+    cursor: pointer;
+  }
+  
   .refresh-button {
     background: var(--button-bg);
     color: var(--button-text);

@@ -26,6 +26,7 @@ const CollectionsFeed = () => {
   const [fetchingMore, setFetchingMore] = useState(false);
   const [searchPerformed, setSearchPerformed] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [useRkeyTimestamp, setUseRkeyTimestamp] = useState(false);
   
   // Effect to load data if username is provided in URL
   useEffect(() => {
@@ -96,6 +97,35 @@ const CollectionsFeed = () => {
     }
   };
   
+  // Helper function to decode TID (rkey) to timestamp
+  const tidToTimestamp = (tid) => {
+    try {
+      // TIDs use a custom base32 encoding
+      const charset = '234567abcdefghijklmnopqrstuvwxyz';
+      
+      // Take just the timestamp part (first 10 chars)
+      const timestampChars = tid.slice(0, 10);
+      
+      // Convert from base32
+      let n = 0;
+      for (let i = 0; i < timestampChars.length; i++) {
+        const charIndex = charset.indexOf(timestampChars[i]);
+        if (charIndex === -1) return null;
+        n = n * 32 + charIndex;
+      }
+      
+      // The timestamp is microseconds since 2023-01-01T00:00:00Z
+      const baseTime = new Date('2023-01-01T00:00:00Z').getTime();
+      const dateMs = baseTime + Math.floor(n / 1000);
+      
+      // Convert to ISO string
+      return new Date(dateMs).toISOString();
+    } catch (error) {
+      console.error('Error decoding TID timestamp:', error);
+      return null;
+    }
+  };
+
   // Helper function to extract timestamp from record
   const extractTimestamp = (record) => {
     // First check if createdAt exists directly in the value
@@ -131,7 +161,6 @@ const CollectionsFeed = () => {
     };
     
     // Try to find a timestamp in the record
-    // No fallback - returning null if no timestamp is found
     return findTimestamp(record);
   };
 
@@ -177,22 +206,20 @@ const CollectionsFeed = () => {
         
         // Process and format records
         return data.records.map(record => {
-          const timestamp = extractTimestamp(record);
-          
-          // Only include records with valid timestamps
-          if (!timestamp) {
-            console.log(`Skipping record without timestamp: ${record.uri}`);
-            return null;
-          }
+          const contentTimestamp = extractTimestamp(record);
+          const rkey = record.uri.split('/').pop();
+          const rkeyTimestamp = tidToTimestamp(rkey);
           
           return {
             ...record,
             collection,
             collectionType: record.value?.$type || collection,
-            timestamp,
-            rkey: record.uri.split('/').pop(),
+            contentTimestamp,
+            rkeyTimestamp,
+            // We'll decide which timestamp to use when filtering/sorting
+            rkey,
           };
-        }).filter(Boolean); // Filter out null records
+        });
       });
       
       // Wait for all fetch operations to complete
@@ -203,9 +230,22 @@ const CollectionsFeed = () => {
         allRecords = [...allRecords, ...records];
       });
       
-      // Filter out records without a timestamp, then sort by timestamp (newest first)
-      allRecords = allRecords.filter(record => record.timestamp)
-        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      // Filter and sort records based on the selected timestamp source
+      allRecords = allRecords.filter(record => {
+        if (useRkeyTimestamp) {
+          // When using rkey timestamps, include all records (all valid TIDs should have timestamps)
+          return record.rkeyTimestamp !== null;
+        } else {
+          // When using content timestamps, only include records with valid content timestamps
+          return record.contentTimestamp !== null;
+        }
+      }).sort((a, b) => {
+        // Sort based on the selected timestamp type
+        const aTime = useRkeyTimestamp ? a.rkeyTimestamp : a.contentTimestamp;
+        const bTime = useRkeyTimestamp ? b.rkeyTimestamp : b.contentTimestamp;
+        
+        return new Date(bTime) - new Date(aTime); // Newest first
+      });
       
       // If not loading more, limit to 50 most recent records for initial display
       if (!isLoadMore) {
@@ -407,6 +447,36 @@ const CollectionsFeed = () => {
                 >
                   Refresh
                 </button>
+              </div>
+              
+              <div className="feed-filters">
+                <div className="timestamp-toggle">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={useRkeyTimestamp}
+                      onChange={() => {
+                        // When toggling, we need to re-sort the records
+                        setUseRkeyTimestamp(!useRkeyTimestamp);
+                        // Re-filter and re-sort the records with the new setting
+                        const sorted = [...records].filter(record => {
+                          if (!useRkeyTimestamp) { // We're switching to rkey timestamps
+                            return record.rkeyTimestamp !== null;
+                          } else { // We're switching to content timestamps
+                            return record.contentTimestamp !== null;
+                          }
+                        }).sort((a, b) => {
+                          const aTime = !useRkeyTimestamp ? a.rkeyTimestamp : a.contentTimestamp;
+                          const bTime = !useRkeyTimestamp ? b.rkeyTimestamp : b.contentTimestamp;
+                          return new Date(bTime) - new Date(aTime);
+                        });
+                        setRecords(sorted);
+                      }}
+                    />
+                    Use Record Key Timestamps
+                  </label>
+                  <span title="Record keys in AT Protocol encode creation timestamps which can differ from timestamps in the record content.">ⓘ</span>
+                </div>
               </div>
               
               {selectedCollections.length === 0 ? (

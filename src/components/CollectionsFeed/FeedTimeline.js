@@ -23,13 +23,43 @@ const FeedTimeline = ({ records, serviceEndpoint }) => {
     }
   };
 
+  // Helper to generate Bluesky app URL from ATProto URI
+  const getBskyAppUrl = (uri) => {
+    if (!uri || !uri.startsWith('at://')) return null;
+    
+    // Parse the at:// URI format: at://did:plc:xyz/collection/rkey
+    const parts = uri.replace('at://', '').split('/');
+    
+    if (parts.length < 3) return null;
+    
+    const did = parts[0];
+    const collection = parts[1];
+    const rkey = parts[2];
+    
+    // Handle different collection types
+    if (collection === 'app.bsky.feed.post') {
+      return `https://bsky.app/profile/${did}/post/${rkey}`;
+    } else if (collection === 'app.bsky.feed.generator') {
+      return `https://bsky.app/profile/${did}/feed/${rkey}`;
+    } else if (collection === 'app.bsky.graph.list') {
+      return `https://bsky.app/profile/${did}/lists/${rkey}`;
+    } else if (collection === 'app.bsky.actor.profile') {
+      return `https://bsky.app/profile/${did}`;
+    }
+    
+    return null;
+  };
+
   // Helper to extract readable content from different record types
   const getRecordContent = (record) => {
     // Extract from specific record types
     if (record.value) {
+      // Initialize result object
+      let result = null;
+      
       // Handle posts with text
       if (record.value.text) {
-        return {
+        result = {
           label: 'Text',
           content: record.value.text.length > 100 
             ? `${record.value.text.substring(0, 100)}...` 
@@ -38,8 +68,8 @@ const FeedTimeline = ({ records, serviceEndpoint }) => {
       }
       
       // Handle likes
-      if (record.collection === 'app.bsky.feed.like' && record.value.subject?.uri) {
-        return {
+      else if (record.collection === 'app.bsky.feed.like' && record.value.subject?.uri) {
+        result = {
           label: 'Liked',
           content: record.value.subject.uri.split('/').pop(),
           subjectUri: record.value.subject.uri,
@@ -48,8 +78,8 @@ const FeedTimeline = ({ records, serviceEndpoint }) => {
       }
       
       // Handle reposts
-      if (record.collection === 'app.bsky.feed.repost' && record.value.subject?.uri) {
-        return {
+      else if (record.collection === 'app.bsky.feed.repost' && record.value.subject?.uri) {
+        result = {
           label: 'Reposted',
           content: record.value.subject.uri.split('/').pop(),
           subjectUri: record.value.subject.uri,
@@ -58,22 +88,38 @@ const FeedTimeline = ({ records, serviceEndpoint }) => {
       }
       
       // Handle follows
-      if (record.collection === 'app.bsky.graph.follow' && record.value.subject) {
-        return {
+      else if (record.collection === 'app.bsky.graph.follow' && record.value.subject) {
+        result = {
           label: 'Followed',
           content: record.value.subject
         };
       }
       
       // Handle generic subject for other types
-      if (record.value.subject?.uri) {
-        return {
+      else if (record.value.subject?.uri) {
+        result = {
           label: 'Subject',
           content: record.value.subject.uri.split('/').pop(),
           subjectUri: record.value.subject.uri,
           subjectCid: record.value.subject.cid
         };
       }
+      
+      // If we found content and it has a subject URI for app.bsky collections, add bskyUrl
+      if (result && result.subjectUri && result.subjectUri.includes('/app.bsky.')) {
+        result.bskyUrl = getBskyAppUrl(result.subjectUri);
+      }
+      
+      // If the record itself is an app.bsky collection, add selfBskyUrl
+      if (record.collection.startsWith('app.bsky.')) {
+        const selfBskyUrl = getBskyAppUrl(record.uri);
+        if (selfBskyUrl) {
+          result = result || {};
+          result.selfBskyUrl = selfBskyUrl;
+        }
+      }
+      
+      return result;
     }
     
     // Fallback: no specific content found
@@ -205,13 +251,44 @@ const FeedTimeline = ({ records, serviceEndpoint }) => {
                   ) : (
                     <span>{content.content}</span>
                   )}
+                  
+                  {/* Show Bluesky links for either the record itself or its subject */}
+                  <div className="bsky-link-container">
+                    {content.bskyUrl && (
+                      <a 
+                        href={content.bskyUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="bsky-link"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M8 0L14.9282 4V12L8 16L1.0718 12V4L8 0Z" fill="#0085ff"/>
+                        </svg>
+                        <span className="bsky-link-text">View on Bluesky (Referenced Content)</span>
+                      </a>
+                    )}
+                    
+                    {content.selfBskyUrl && !content.bskyUrl && (
+                      <a 
+                        href={content.selfBskyUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="bsky-link"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M8 0L14.9282 4V12L8 16L1.0718 12V4L8 0Z" fill="#0085ff"/>
+                        </svg>
+                        <span className="bsky-link-text">View on Bluesky</span>
+                      </a>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
             
             <div className="feed-item-footer">
               <div className="record-timestamp">
-                {formatRelativeTime(record.timestamp)}
+                {formatRelativeTime(record.contentTimestamp || record.rkeyTimestamp)}
               </div>
             </div>
           </div>

@@ -131,7 +131,8 @@ const CollectionsFeed = () => {
     };
     
     // Try to find a timestamp in the record
-    return findTimestamp(record) || new Date().toISOString(); // Fallback to current time
+    // No fallback - returning null if no timestamp is found
+    return findTimestamp(record);
   };
 
   // Function to fetch records from collections
@@ -177,6 +178,13 @@ const CollectionsFeed = () => {
         // Process and format records
         return data.records.map(record => {
           const timestamp = extractTimestamp(record);
+          
+          // Only include records with valid timestamps
+          if (!timestamp) {
+            console.log(`Skipping record without timestamp: ${record.uri}`);
+            return null;
+          }
+          
           return {
             ...record,
             collection,
@@ -184,7 +192,7 @@ const CollectionsFeed = () => {
             timestamp,
             rkey: record.uri.split('/').pop(),
           };
-        });
+        }).filter(Boolean); // Filter out null records
       });
       
       // Wait for all fetch operations to complete
@@ -195,12 +203,9 @@ const CollectionsFeed = () => {
         allRecords = [...allRecords, ...records];
       });
       
-      // Sort records by timestamp (newest first)
-      allRecords.sort((a, b) => {
-        if (!a.timestamp) return 1;
-        if (!b.timestamp) return -1;
-        return new Date(b.timestamp) - new Date(a.timestamp);
-      });
+      // Filter out records without a timestamp, then sort by timestamp (newest first)
+      allRecords = allRecords.filter(record => record.timestamp)
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
       
       // If not loading more, limit to 50 most recent records for initial display
       if (!isLoadMore) {

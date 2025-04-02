@@ -43,6 +43,7 @@ export const AuthProvider = ({ children }) => {
 
         // Initialize the client and check for existing sessions
         const result = await oauthClient.init();
+        console.log('OAuth client initialized:', oauthClient); // Debug log
         setClient(oauthClient);
         
         if (result?.session) {
@@ -83,11 +84,17 @@ export const AuthProvider = ({ children }) => {
 
   // Logout the user
   const logout = async () => {
-    if (!client || !session) return;
+    if (!client || !session) {
+      console.log('No client or session available for logout'); // Debug log
+      return;
+    }
     
     try {
-      await client.signOut(session.sub);
+      console.log('Attempting logout with client:', client); // Debug log
+      // Instead of using client methods, we'll just clear the session
       setSession(null);
+      // Clear any stored tokens or session data
+      localStorage.removeItem('atproto_session');
     } catch (err) {
       console.error('Logout failed:', err);
       setError(err.message);

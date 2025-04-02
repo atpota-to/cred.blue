@@ -81,10 +81,36 @@ export const AuthProvider = ({ children }) => {
             const atprotoSession = localStorage.getItem('atproto_session');
             console.log('atproto_session in localStorage:', atprotoSession ? 'exists' : 'not found');
             
+            // Try to extract handle from session
+            let handle = result.session.handle;
+            
+            // If handle is missing, try to extract it from other sources
+            if (!handle) {
+              try {
+                // Try server login data
+                if (result.session.server && result.session.server.login && result.session.server.login.handle) {
+                  handle = result.session.server.login.handle;
+                } 
+                // Try atproto_session in localStorage if it exists
+                else if (atprotoSession) {
+                  try {
+                    const parsedSession = JSON.parse(atprotoSession);
+                    if (parsedSession && parsedSession.handle) {
+                      handle = parsedSession.handle;
+                    }
+                  } catch (e) {
+                    console.error('Error parsing atproto_session:', e);
+                  }
+                }
+              } catch (e) {
+                console.error('Error extracting handle:', e);
+              }
+            }
+            
             // Format session data for our internal use and sync with server
             const sessionData = {
               did: result.session.sub,
-              handle: result.session.handle
+              handle: handle || 'unknown' // Ensure we always have a handle value
             };
             
             console.log('Syncing session with server:', sessionData);
@@ -107,22 +133,69 @@ export const AuthProvider = ({ children }) => {
               } else {
                 console.warn('Initial session sync failed:', await syncResponse.text());
                 
-                // If sync fails, use client session in our internal format
-                console.log('Using client session as fallback');
+                // If sync fails, extract what we can from the result.session
+                const handle = result.session.handle;
+                
+                // Try to get the handle from other properties if undefined
+                let fallbackHandle = handle;
+                if (!fallbackHandle) {
+                  // Check if we can extract handle from other properties
+                  try {
+                    // If we have additional properties in the session that might contain the handle
+                    if (result.session.server && result.session.server.login && result.session.server.login.handle) {
+                      fallbackHandle = result.session.server.login.handle;
+                    } else if (result.session.displayName && result.session.displayName.includes('@')) {
+                      // Sometimes displayName has the handle
+                      fallbackHandle = result.session.displayName.replace('@', '');
+                    } else {
+                      // Fallback to 'unknown' if we can't find a handle
+                      fallbackHandle = 'unknown';
+                    }
+                  } catch (e) {
+                    console.error('Error extracting handle from session:', e);
+                    fallbackHandle = 'unknown';
+                  }
+                }
+                
+                // Log what we're doing
+                console.log(`Using client session as fallback with handle: ${fallbackHandle}`);
+                
+                // Use client session in our internal format
                 setSession({
                   did: result.session.sub,
-                  handle: result.session.handle,
-                  displayName: result.session.handle
+                  handle: fallbackHandle,
+                  displayName: result.session.displayName || fallbackHandle
                 });
               }
             } catch (syncError) {
               console.error('Error syncing initial session:', syncError);
               
+              // Extract handle with fallbacks similar to above
+              const handle = result.session.handle;
+              let fallbackHandle = handle;
+              
+              if (!fallbackHandle) {
+                try {
+                  if (result.session.server && result.session.server.login && result.session.server.login.handle) {
+                    fallbackHandle = result.session.server.login.handle;
+                  } else if (result.session.displayName && result.session.displayName.includes('@')) {
+                    fallbackHandle = result.session.displayName.replace('@', '');
+                  } else {
+                    fallbackHandle = 'unknown';
+                  }
+                } catch (e) {
+                  console.error('Error extracting handle from session:', e);
+                  fallbackHandle = 'unknown';
+                }
+              }
+              
+              console.log(`Using client session after error with handle: ${fallbackHandle}`);
+              
               // If sync fails, still use client session in our internal format
               setSession({
                 did: result.session.sub,
-                handle: result.session.handle,
-                displayName: result.session.handle
+                handle: fallbackHandle,
+                displayName: result.session.displayName || fallbackHandle
               });
             }
           } else {
@@ -298,11 +371,29 @@ export const AuthProvider = ({ children }) => {
           try {
             console.log('Server says not authenticated but we have a client session, trying to sync');
             
+            // Extract handle from current session
+            let handle = session.handle;
+            if (!handle) {
+              // If our session doesn't have a handle, try to extract from other properties
+              try {
+                if (session.displayName && typeof session.displayName === 'string') {
+                  // Sometimes the handle might be in the displayName
+                  handle = session.displayName.includes('@') ? 
+                    session.displayName.replace('@', '') : 
+                    session.displayName;
+                }
+              } catch (e) {
+                console.error('Error extracting handle from session:', e);
+              }
+            }
+            
             // Format session data properly
             const sessionData = {
               did: session.did || session.sub,
-              handle: session.handle
+              handle: handle || 'unknown' // Always provide a handle value
             };
+            
+            console.log('Syncing with data:', sessionData);
             
             // Try to sync one more time
             const syncResponse = await fetch('/api/sync-session', {

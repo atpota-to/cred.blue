@@ -155,15 +155,25 @@ const Navbar = () => {
   const getDisplayName = () => {
     if (!session) return '';
     
-    // Try to get the handle from the session
-    const handle = session.handle || '';
-    
-    // If it's a DID, show a shortened version
-    if (session.sub.startsWith('did:')) {
-      return session.sub.substring(0, 15) + '...';
+    // First try displayName if available
+    if (session.displayName) {
+      return session.displayName;
     }
     
-    return handle;
+    // Try to get the handle from the session
+    const handle = session.handle || '';
+    if (handle) {
+      return handle;
+    }
+    
+    // Try to get DID (could be in session.did or session.sub)
+    const did = session.did || session.sub;
+    if (did && did.startsWith('did:')) {
+      return did.substring(0, 15) + '...';
+    }
+    
+    // Fallback
+    return 'User';
   };
 
   return (

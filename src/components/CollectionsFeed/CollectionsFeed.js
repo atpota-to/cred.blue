@@ -488,26 +488,88 @@ const CollectionsFeed = () => {
     // No need to refresh as we'll show "no collections selected" message
   };
   
-  // Handle refresh button click
+  // Handle refresh button click - only updates the feed, not the chart
   const handleRefresh = async () => {
     if (did && serviceEndpoint) {
       console.log("Refresh requested for selected collections:", selectedCollections);
       
-      // Set loading state for chart to true
-      setChartLoading(true);
+      // Set a loading state but not for the chart
+      setLoading(true);
       
       try {
-        // The fetchCollectionRecords function will handle merging the new data
-        // with existing data for other collections
-        await fetchCollectionRecords(did, serviceEndpoint, selectedCollections, false);
+        // Fetch just the most recent records for the feed display
+        const refreshOnlyFeed = async () => {
+          let recentRecords = [];
+          
+          // Process each selected collection sequentially
+          for (const collection of selectedCollections) {
+            try {
+              // Fetch just one page of the most recent records
+              const url = `${serviceEndpoint}/xrpc/com.atproto.repo.listRecords?repo=${encodeURIComponent(did)}&collection=${encodeURIComponent(collection)}&limit=25`;
+              
+              const response = await fetch(url);
+              
+              if (!response.ok) {
+                console.error(`Error refreshing ${collection}: ${response.statusText}`);
+                continue; // Skip this collection but continue with others
+              }
+              
+              const data = await response.json();
+              
+              if (data.records && data.records.length > 0) {
+                console.log(`Refreshed ${data.records.length} records for ${collection}`);
+                
+                // Process the records with timestamps
+                const processedRecords = data.records.map(record => {
+                  const contentTimestamp = extractTimestamp(record);
+                  const rkey = record.uri.split('/').pop();
+                  const rkeyTimestamp = tidToTimestamp(rkey);
+                  
+                  return {
+                    ...record,
+                    collection,
+                    collectionType: record.value?.$type || collection,
+                    contentTimestamp,
+                    rkeyTimestamp,
+                    rkey,
+                  };
+                });
+                
+                // Add to our records array
+                recentRecords = [...recentRecords, ...processedRecords];
+              }
+            } catch (err) {
+              console.error(`Error refreshing collection ${collection}:`, err);
+              // Continue with other collections
+            }
+          }
+          
+          // Sort the refreshed records by timestamp (newest first)
+          const sortedRecords = recentRecords.filter(record => {
+            if (useRkeyTimestamp) {
+              return record.rkeyTimestamp !== null;
+            } else {
+              return record.contentTimestamp !== null;
+            }
+          }).sort((a, b) => {
+            const aTime = useRkeyTimestamp ? a.rkeyTimestamp : a.contentTimestamp;
+            const bTime = useRkeyTimestamp ? b.rkeyTimestamp : b.contentTimestamp;
+            return new Date(bTime) - new Date(aTime);
+          });
+          
+          // Only update the feed display records, not the chart data
+          setRecords(sortedRecords.slice(0, 25));
+          console.log(`Feed refreshed with ${sortedRecords.length} records`);
+        };
         
-        console.log("Refresh completed successfully");
+        await refreshOnlyFeed();
+        console.log("Feed refresh completed successfully");
       } catch (err) {
-        console.error("Error during refresh:", err);
+        console.error("Error during feed refresh:", err);
         setError('Failed to refresh records. Please try again.');
       } finally {
         // Ensure loading state is reset
-        setChartLoading(false);
+        setLoading(false);
       }
     }
   };
@@ -580,18 +642,18 @@ const CollectionsFeed = () => {
       </Helmet>
       
       {initialLoad && !username ? (
-        <div className="search-container">
-          <h1>Omnifeed</h1>
-          <p className="intro-text">
-            Enter a Bluesky handle to see their AT Protocol collection records in chronological order.
+        <div className="omni-card alt-card">
+          <h1>Bluesky Omnifeed</h1>
+          <p>
+            View and analyze any Bluesky account's AT Protocol collection records chronologically.
           </p>
-          <div className="search-bar-container">
-            <form className="search-bar" onSubmit={(e) => {
-              e.preventDefault();
-              if (handle.trim() !== "") {
-                loadUserData(handle.trim());
-              }
-            }} role="search">
+          <form className="search-bar" onSubmit={(e) => {
+            e.preventDefault();
+            if (handle.trim() !== "") {
+              loadUserData(handle.trim());
+            }
+          }} role="search">
+            <div>
               <input
                 type="text"
                 placeholder="(e.g. user.bsky.social)"
@@ -599,8 +661,15 @@ const CollectionsFeed = () => {
                 onChange={(e) => setHandle(e.target.value)}
                 required
               />
-              <button type="submit">Search</button>
-            </form>
+            </div>
+            <div className="action-row">
+              <button className="analyze-button" type="submit">Analyze</button>
+            </div>
+          </form>
+          
+          <div className="omni-info-card">
+            <h3>What is Omnifeed?</h3>
+            <p>Omnifeed provides a chronological view of a user's entire ATProto repository, including all collections such as posts, likes, follows, and more. It helps you analyze account history and activity patterns.</p>
           </div>
         </div>
       ) : (
@@ -703,7 +772,16 @@ const CollectionsFeed = () => {
                   
                   <div className={`filter-dropdown-menu ${dropdownOpen ? 'open' : ''}`}>
                     <div className="filter-header">
-                      <h3>Select Collections</h3>
+                      <div className="filter-header-top">
+                        <h3>Select Collections</h3>
+                        <button 
+                          className="filter-close-mobile"
+                          onClick={() => setDropdownOpen(false)}
+                          aria-label="Close"
+                        >
+                          ✕
+                        </button>
+                      </div>
                       <div className="filter-actions">
                         <button 
                           className="select-all-button"
@@ -759,8 +837,9 @@ const CollectionsFeed = () => {
                   className="refresh-button"
                   onClick={handleRefresh}
                   disabled={loading || selectedCollections.length === 0}
+                  title="Refresh only the feed, not the chart"
                 >
-                  Refresh
+                  Refresh Feed
                 </button>
               </div>
               

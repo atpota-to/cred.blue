@@ -318,6 +318,16 @@
   .load-more-container {
     text-align: center;
     margin: 30px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+  }
+  
+  .records-count {
+    font-size: 0.9rem;
+    color: var(--text);
+    opacity: 0.8;
   }
   
   .load-more-button {

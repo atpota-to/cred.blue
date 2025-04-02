@@ -412,30 +412,63 @@ const CollectionsFeed = () => {
   
   // Handle load more button click
   const handleLoadMore = async () => {
-    if (did && serviceEndpoint && Object.keys(collectionCursors).length > 0) {
+    setFetchingMore(true);
+    
+    // First check if we already have more records locally that we can show
+    if (hasMoreRecordsLocally) {
+      console.log("Loading more records from local cache");
+      // Simply increase the number of displayed records
+      const currentDisplayCount = filteredRecords.length;
+      const nextBatchSize = 25;
+      
+      // Store the new count so our filteredRecords computation shows more records
+      setRecords(prev => {
+        // Create a dummy array of the right length to control how many records are shown
+        return Array(currentDisplayCount + nextBatchSize).fill(null);
+      });
+      
+      setFetchingMore(false);
+    } 
+    // If we've displayed all local records but have cursors to fetch more from the API
+    else if (hasMoreRecordsRemotely) {
+      console.log("Fetching more records from API");
       // Only load more from collections that have cursors and are selected
       const collectionsToLoad = selectedCollections.filter(collection => collectionCursors[collection]);
       
       if (collectionsToLoad.length > 0) {
         await fetchCollectionRecords(did, serviceEndpoint, collectionsToLoad, true);
+      } else {
+        setFetchingMore(false);
       }
+    } else {
+      console.log("No more records to load");
+      setFetchingMore(false);
     }
   };
   
-  // Filter records for timeline display based on selected collections
-  const filteredRecords = records.filter(record => 
-    selectedCollections.includes(record.collection)
-  );
-
-  // Filter ALL chart records based on selected collections - this is what the chart will use
+  // Filter ALL chart records based on selected collections
   const filteredChartRecords = allRecordsForChart.filter(record => 
     selectedCollections.includes(record.collection)
   );
+
+  // For timeline display, directly use the chart records but limit to most recent 25
+  // This ensures we always show the most recent records for the selected collections
+  // regardless of what was initially loaded in the records state
+  const filteredRecords = filteredChartRecords
+    .sort((a, b) => {
+      // Sort by timestamp (newest first)
+      const aTime = useRkeyTimestamp ? a.rkeyTimestamp : a.contentTimestamp;
+      const bTime = useRkeyTimestamp ? b.rkeyTimestamp : b.contentTimestamp;
+      return new Date(bTime) - new Date(aTime);
+    })
+    .slice(0, fetchingMore ? records.length : 25); // Show 25 records initially, more when loading more
   
-  // Check if more records can be loaded
-  const canLoadMore = Object.keys(collectionCursors).some(collection => 
+  // Check if more records can be loaded - either from API or from our existing dataset
+  const hasMoreRecordsLocally = filteredChartRecords.length > filteredRecords.length;
+  const hasMoreRecordsRemotely = Object.keys(collectionCursors).some(collection => 
     selectedCollections.includes(collection)
   );
+  const canLoadMore = hasMoreRecordsLocally || hasMoreRecordsRemotely;
   
   return (
     <div className="collections-feed-container">
@@ -668,15 +701,21 @@ const CollectionsFeed = () => {
                     </div>
                   )}
                   
-                  {filteredRecords.length > 0 && canLoadMore && (
+                  {filteredRecords.length > 0 && (
                     <div className="load-more-container">
-                      <button 
-                        className="load-more-button"
-                        onClick={handleLoadMore}
-                        disabled={fetchingMore}
-                      >
-                        {fetchingMore ? 'Loading...' : 'Load More Records'}
-                      </button>
+                      <div className="records-count">
+                        Showing {filteredRecords.length} of {filteredChartRecords.length} records
+                      </div>
+                      
+                      {canLoadMore && (
+                        <button 
+                          className="load-more-button"
+                          onClick={handleLoadMore}
+                          disabled={fetchingMore}
+                        >
+                          {fetchingMore ? 'Loading...' : 'Load More Records'}
+                        </button>
+                      )}
                     </div>
                   )}
                 </>

@@ -686,6 +686,27 @@ const CollectionsFeed = () => {
     // No need to refresh as we'll show "no collections selected" message
   };
   
+  // Toggle dropdown
+  const toggleDropdown = () => {
+    setDropdownOpen(!dropdownOpen);
+  };
+  
+  // Close dropdown when clicking outside
+  const closeDropdown = useCallback((e) => {
+    if (dropdownOpen && e.target.closest('.filter-dropdown-menu') === null && 
+        e.target.closest('.filter-dropdown-toggle') === null) {
+      setDropdownOpen(false);
+    }
+  }, [dropdownOpen]);
+  
+  // Add event listener to detect clicks outside the dropdown
+  useEffect(() => {
+    document.addEventListener('mousedown', closeDropdown);
+    return () => {
+      document.removeEventListener('mousedown', closeDropdown);
+    };
+  }, [closeDropdown]);
+  
   // Handle refresh button click - only updates the feed, not the chart
   const handleRefresh = async () => {
     if (did && serviceEndpoint) {
@@ -1000,30 +1021,77 @@ const CollectionsFeed = () => {
               
               {/* Collections filter area */}
               {collections.length > 0 && (
-                <div className="collections-filter">
-                  <h3>Collections</h3>
-                  <div className="filter-actions">
-                    <button onClick={selectAllCollections} className="select-all">Select All</button>
-                    <button onClick={deselectAllCollections} className="deselect-all">Deselect All</button>
-                    <button onClick={handleRefresh} className="refresh-button" disabled={loading || fetchingMore}>
-                      {loading ? 'Refreshing...' : 'Refresh'}
-                    </button>
+                <div className="feed-controls">
+                  <div className="filter-container">
+                    <div 
+                      className="filter-dropdown-toggle" 
+                      onClick={toggleDropdown}
+                    >
+                      <span>
+                        Collections 
+                        <span className="selected-collections-count">
+                          {selectedCollections.length}
+                        </span>
+                      </span>
+                      <span className={`arrow ${dropdownOpen ? 'open' : ''}`}>▼</span>
+                    </div>
+                    
+                    <div className={`filter-dropdown-menu ${dropdownOpen ? 'open' : ''}`}>
+                      <div className="filter-header">
+                        <div className="filter-header-top">
+                          <h3>Collections</h3>
+                          <button className="filter-close-mobile" onClick={() => setDropdownOpen(false)}>
+                            ✕
+                          </button>
+                        </div>
+                        <div className="filter-actions">
+                          <button 
+                            className="select-all-button" 
+                            onClick={selectAllCollections}
+                            disabled={collections.length === selectedCollections.length}
+                          >
+                            Select All
+                          </button>
+                          <button 
+                            className="deselect-all-button" 
+                            onClick={deselectAllCollections}
+                            disabled={selectedCollections.length === 0}
+                          >
+                            Deselect All
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div className="collections-filter">
+                        {collections.map(collection => (
+                          <div 
+                            key={collection} 
+                            className={`collection-item ${selectedCollections.includes(collection) ? 'selected' : ''}`}
+                            onClick={() => toggleCollection(collection)}
+                          >
+                            <input
+                              type="checkbox"
+                              className="collection-item-checkbox"
+                              checked={selectedCollections.includes(collection)}
+                              onChange={() => toggleCollection(collection)}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <span className="collection-item-name">{collection}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    {dropdownOpen && <div className="filter-dropdown-backdrop open" onClick={() => setDropdownOpen(false)}></div>}
                   </div>
                   
-                  <div className="collections-list">
-                    {collections.map(collection => (
-                      <div key={collection} className="collection-item">
-                        <label>
-                          <input
-                            type="checkbox"
-                            checked={selectedCollections.includes(collection)}
-                            onChange={() => toggleCollection(collection)}
-                          />
-                          {collection}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
+                  <button 
+                    onClick={handleRefresh} 
+                    className="refresh-button" 
+                    disabled={loading || fetchingMore || selectedCollections.length === 0}
+                  >
+                    {loading ? 'Refreshing...' : 'Refresh'}
+                  </button>
                 </div>
               )}
               

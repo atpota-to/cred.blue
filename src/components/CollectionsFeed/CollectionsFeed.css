@@ -63,6 +63,14 @@
   min-height: 80vh;
 }
 
+.search-container.fade-in {
+  display: inline;
+}
+
+.search-container {
+  display: inline;
+}
+
 /* Alt Card Style (matching Alt Text Rating Tool) */
 .alt-card {
   background-color: var(--post-background-color);

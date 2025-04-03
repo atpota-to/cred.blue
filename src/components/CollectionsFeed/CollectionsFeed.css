@@ -59,6 +59,8 @@
   margin: 20px auto;
   padding: 0 20px;
   font-family: 'articulat-cf', sans-serif;
+  position: relative;
+  min-height: 80vh;
 }
 
 /* Alt Card Style (matching Alt Text Rating Tool) */
@@ -1263,4 +1265,24 @@ body.dark-mode .omni-info-card {
   font-size: 12px;
   overflow-x: auto;
   white-space: pre-wrap;
+}
+
+/* Matter Loading Animation Container */
+.matter-loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
+  width: 100%;
+}
+
+/* Add animation for content fade-in */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.fade-in {
+  animation: fadeIn 0.5s ease-in-out;
 }

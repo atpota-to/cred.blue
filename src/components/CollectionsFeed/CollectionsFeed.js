@@ -37,6 +37,7 @@ const CollectionsFeed = () => {
   const [displayCount, setDisplayCount] = useState(25);
   const [debugInfo, setDebugInfo] = useState(null);
   const [showDebug, setShowDebug] = useState(false);
+  const [showContent, setShowContent] = useState(false); // Add state for content visibility
   
   // Helper functions
   const tidToTimestamp = (tid) => {
@@ -365,6 +366,7 @@ const CollectionsFeed = () => {
     
     // Reset state for new search
     setLoading(true);
+    setShowContent(false); // Hide content while loading
     setError('');
     setDid('');
     setServiceEndpoint('');
@@ -521,6 +523,8 @@ const CollectionsFeed = () => {
       setSearchPerformed(true);
       setInitialLoad(false);
       setLoading(false);
+      // Add a slight delay before showing content for smooth transition
+      setTimeout(() => setShowContent(true), 100);
     } catch (err) {
       console.error('Error loading user data:', err);
       
@@ -546,6 +550,7 @@ const CollectionsFeed = () => {
       setError(userMessage);
       setInitialLoad(false);
       setLoading(false);
+      setShowContent(true); // Show content even on error so user can see error message
     }
   }, [navigate, checkAuthStatus]);
   
@@ -556,6 +561,15 @@ const CollectionsFeed = () => {
     const verifyAuth = async () => {
       try {
         setLoading(true);
+        setInitialLoad(true);
+        setShowContent(false);
+        
+        // Reset states if username changes
+        if (username) {
+          setError('');
+          setSearchTerm(username);
+        }
+        
         const authResult = await checkAuthStatus();
         
         if (!authResult) {
@@ -566,17 +580,27 @@ const CollectionsFeed = () => {
           return;
         }
         
-        setLoading(false);
-        
-        // If we have a username in the URL and we're authenticated, load the data
+        // If a username is provided in the URL, load that user's data
         if (username && authResult) {
+          console.log('Username provided in URL, loading data for:', username);
           loadUserData(username);
+        } else {
+          // Only set loading to false if we're not loading a specific user
+          setLoading(false);
+          setInitialLoad(false);
+          setShowContent(true);
         }
       } catch (err) {
         console.error('Auth verification failed:', err);
         setError('Authentication failed. Please try logging in again.');
         setLoading(false);
-        navigate('/login');
+        setInitialLoad(false);
+        setShowContent(true);
+        
+        // Add a delay before redirecting to show the error message
+        setTimeout(() => {
+          navigate('/login');
+        }, 2000);
       }
     };
     
@@ -588,6 +612,7 @@ const CollectionsFeed = () => {
       if (!authResult && isAuthenticated) {
         // Session was lost during browsing
         setError('Your session has expired. Please log in again.');
+        setInitialLoad(false);
         // Show the error for 3 seconds before redirecting
         setTimeout(() => {
           const returnUrl = encodeURIComponent(window.location.pathname);
@@ -596,7 +621,15 @@ const CollectionsFeed = () => {
       }
     }, 30000); // Check every 30 seconds
     
-    return () => clearInterval(interval);
+    // Safety timeout to ensure initialLoad is cleared after 10 seconds maximum
+    const loadingTimeout = setTimeout(() => {
+      setInitialLoad(false);
+    }, 10000);
+    
+    return () => {
+      clearInterval(interval);
+      clearTimeout(loadingTimeout);
+    };
   }, [isAuthenticated, checkAuthStatus, navigate, username, loadUserData]);
   
   // Effect to watch for selected collections changes
@@ -815,7 +848,8 @@ const CollectionsFeed = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (searchTerm.trim() !== '') {
-      loadUserData(searchTerm.trim());
+      // Instead of directly loading the user data, navigate to their dedicated omnifeed page
+      navigate(`/omnifeed/${searchTerm.trim()}`);
     }
   };
   
@@ -848,199 +882,209 @@ const CollectionsFeed = () => {
         <meta name="description" content={username ? `View ${username}'s AT Protocol collection records in chronological order` : 'View AT Protocol collection records in chronological order'} />
       </Helmet>
       
-      <div className="search-container">
-        <h1>OmniFeed</h1>
-        <p className="feed-description">
-          View all repository collections for a Bluesky user, including custom collections from AT Protocol apps.
-        </p>
-        
-        {/* Authentication status banner */}
-        {!isAuthenticated && (
-          <div className="auth-warning">
-            <p>
-              <strong>Authentication Required:</strong> You need to be logged in to view the OmniFeed.
-              Redirecting to login...
-            </p>
-          </div>
-        )}
-        
-        <form onSubmit={handleSubmit} className="search-form">
-          <div className="search-box">
-            <input 
-              type="text" 
-              placeholder="Enter a Bluesky handle (e.g. cred.blue)" 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              disabled={loading}
-            />
-            <button 
-              type="submit" 
-              disabled={loading || !searchTerm || searchTerm.trim() === ''}
-            >
-              {loading ? 'Loading...' : 'Search'}
-            </button>
-          </div>
-        </form>
-        
-        {/* Error message with more styling and retry button */}
-        {error && (
-          <div className="error-container">
-            <div className="error-message">
-              <p>{error}</p>
-              {error.includes('authenticated') ? (
-                <button 
-                  className="error-action-button"
-                  onClick={() => {
-                    const returnUrl = encodeURIComponent(window.location.pathname);
-                    navigate(`/login?returnUrl=${returnUrl}`);
-                  }}
-                >
-                  Go to Login
-                </button>
-              ) : (
-                <button 
-                  className="error-action-button"
-                  onClick={() => {
-                    setError('');
-                    if (username) {
-                      loadUserData(username);
-                    }
-                  }}
-                >
-                  Retry
-                </button>
-              )}
+      {/* Display MatterLoadingAnimation for the main loading state when username is provided */}
+      {username && loading && !error && (
+        <div className="matter-loading-container">
+          <MatterLoadingAnimation />
+        </div>
+      )}
+      
+      {/* Only show the main content when not in full-screen loading mode */}
+      {(!username || !loading || error) && (
+        <div className={`search-container ${showContent ? 'fade-in' : ''}`}>
+          <h1>OmniFeed</h1>
+          <p className="feed-description">
+            View all repository collections for a Bluesky user, including custom collections from AT Protocol apps.
+          </p>
+          
+          {/* Authentication status banner */}
+          {!isAuthenticated && (
+            <div className="auth-warning">
+              <p>
+                <strong>Authentication Required:</strong> You need to be logged in to view the OmniFeed.
+                Redirecting to login...
+              </p>
             </div>
-          </div>
-        )}
-        
-        {/* Initial loading state */}
-        {initialLoad && !error && (
-          <div className="loading-indicator">
-            <div className="spinner"></div>
-            <p>Connecting to AT Protocol services...</p>
-          </div>
-        )}
-        
-        {/* Main content once search is performed */}
-        {searchPerformed && !initialLoad && (
-          <div className="user-info">
-            {displayName && (
-              <h2>
-                Collections for {displayName}
-                <span className="handle">@{handle}</span>
-              </h2>
-            )}
-            
-            {/* Collections count and timeframe */}
-            {collections.length > 0 && (
-              <div className="collections-meta">
-                <p>{collections.length} collections found</p>
-                <div className="time-toggle">
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={useRkeyTimestamp}
-                      onChange={() => setUseRkeyTimestamp(!useRkeyTimestamp)}
-                    />
-                    Use record IDs for timestamps
-                  </label>
-                  <span className="info-tooltip">
-                    ?
-                    <span className="tooltip-text">
-                      Toggle between using timestamps found within the content (more accurate) or derived from record IDs (complete coverage)
-                    </span>
-                  </span>
-                </div>
-              </div>
-            )}
-            
-            {/* Collections filter area */}
-            {collections.length > 0 && (
-              <div className="collections-filter">
-                <h3>Collections</h3>
-                <div className="filter-actions">
-                  <button onClick={selectAllCollections} className="select-all">Select All</button>
-                  <button onClick={deselectAllCollections} className="deselect-all">Deselect All</button>
-                  <button onClick={handleRefresh} className="refresh-button" disabled={loading || fetchingMore}>
-                    {loading ? 'Refreshing...' : 'Refresh'}
+          )}
+          
+          <form onSubmit={handleSubmit} className="search-form">
+            <div className="search-box">
+              <input 
+                type="text" 
+                placeholder="Enter a Bluesky handle (e.g. cred.blue)" 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                disabled={loading}
+              />
+              <button 
+                type="submit" 
+                disabled={loading || !searchTerm || searchTerm.trim() === ''}
+              >
+                {loading ? 'Loading...' : 'Search'}
+              </button>
+            </div>
+          </form>
+          
+          {/* Error message with more styling and retry button */}
+          {error && (
+            <div className="error-container">
+              <div className="error-message">
+                <p>{error}</p>
+                {error.includes('authenticated') ? (
+                  <button 
+                    className="error-action-button"
+                    onClick={() => {
+                      const returnUrl = encodeURIComponent(window.location.pathname);
+                      navigate(`/login?returnUrl=${returnUrl}`);
+                    }}
+                  >
+                    Go to Login
                   </button>
-                </div>
-                
-                <div className="collections-list">
-                  {collections.map(collection => (
-                    <div key={collection} className="collection-item">
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={selectedCollections.includes(collection)}
-                          onChange={() => toggleCollection(collection)}
-                        />
-                        {collection}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {/* Loading indicator for chart update */}
-            {chartLoading && (
-              <div className="chart-loading">
-                <div className="spinner"></div>
-                <p>Loading historical data for visualization...</p>
-              </div>
-            )}
-            
-            {/* Activity Chart */}
-            {!chartLoading && filteredChartRecords.length > 0 && (
-              <div className="chart-container">
-                <h3>Activity Timeline</h3>
-                <ActivityChart 
-                  records={filteredChartRecords} 
-                  useRkeyTimestamp={useRkeyTimestamp}
-                />
-              </div>
-            )}
-            
-            {/* Feed heading */}
-            {selectedCollections.length > 0 && (
-              <>
-                <h3 className="feed-heading">Record Feed</h3>
-                {filteredRecords.length === 0 && !loading && (
-                  <p className="no-records-message">No records found for the selected collections.</p>
+                ) : (
+                  <button 
+                    className="error-action-button"
+                    onClick={() => {
+                      setError('');
+                      if (username) {
+                        loadUserData(username);
+                      }
+                    }}
+                  >
+                    Retry
+                  </button>
                 )}
-              </>
-            )}
-            
-            {/* Feed records */}
-            {selectedCollections.length === 0 ? (
-              <p className="no-collections-selected">Select at least one collection to see records.</p>
-            ) : (
-              <>
-                <FeedTimeline 
-                  records={filteredRecords} 
-                  useRkeyTimestamp={useRkeyTimestamp}
-                  loading={loading}
-                />
-                
-                {/* Load more button */}
-                {filteredRecords.length > 0 && (hasMoreRecordsLocally || hasMoreRecordsRemotely) && (
-                  <div className="load-more-container">
-                    <button 
-                      onClick={handleLoadMore} 
-                      disabled={fetchingMore}
-                      className="load-more-button"
-                    >
-                      {fetchingMore ? 'Loading...' : 'Load More'}
+              </div>
+            </div>
+          )}
+          
+          {/* Show simpler loading spinner when searching from the form, not the full MatterLoadingAnimation */}
+          {!username && initialLoad && !error && (
+            <div className="loading-indicator">
+              <div className="spinner"></div>
+              <p>Connecting to AT Protocol services...</p>
+            </div>
+          )}
+          
+          {/* Main content once search is performed */}
+          {searchPerformed && !initialLoad && (
+            <div className="user-info">
+              {displayName && (
+                <h2>
+                  Collections for {displayName}
+                  <span className="handle">@{handle}</span>
+                </h2>
+              )}
+              
+              {/* Collections count and timeframe */}
+              {collections.length > 0 && (
+                <div className="collections-meta">
+                  <p>{collections.length} collections found</p>
+                  <div className="time-toggle">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={useRkeyTimestamp}
+                        onChange={() => setUseRkeyTimestamp(!useRkeyTimestamp)}
+                      />
+                      Use record IDs for timestamps
+                    </label>
+                    <span className="info-tooltip">
+                      ?
+                      <span className="tooltip-text">
+                        Toggle between using timestamps found within the content (more accurate) or derived from record IDs (complete coverage)
+                      </span>
+                    </span>
+                  </div>
+                </div>
+              )}
+              
+              {/* Collections filter area */}
+              {collections.length > 0 && (
+                <div className="collections-filter">
+                  <h3>Collections</h3>
+                  <div className="filter-actions">
+                    <button onClick={selectAllCollections} className="select-all">Select All</button>
+                    <button onClick={deselectAllCollections} className="deselect-all">Deselect All</button>
+                    <button onClick={handleRefresh} className="refresh-button" disabled={loading || fetchingMore}>
+                      {loading ? 'Refreshing...' : 'Refresh'}
                     </button>
                   </div>
-                )}
-              </>
-            )}
-          </div>
-        )}
-      </div>
+                  
+                  <div className="collections-list">
+                    {collections.map(collection => (
+                      <div key={collection} className="collection-item">
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={selectedCollections.includes(collection)}
+                            onChange={() => toggleCollection(collection)}
+                          />
+                          {collection}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Loading indicator for chart update */}
+              {chartLoading && (
+                <div className="chart-loading">
+                  <div className="spinner"></div>
+                  <p>Loading historical data for visualization...</p>
+                </div>
+              )}
+              
+              {/* Activity Chart */}
+              {!chartLoading && filteredChartRecords.length > 0 && (
+                <div className="chart-container">
+                  <h3>Activity Timeline</h3>
+                  <ActivityChart 
+                    records={filteredChartRecords} 
+                    useRkeyTimestamp={useRkeyTimestamp}
+                  />
+                </div>
+              )}
+              
+              {/* Feed heading */}
+              {selectedCollections.length > 0 && (
+                <>
+                  <h3 className="feed-heading">Record Feed</h3>
+                  {filteredRecords.length === 0 && !loading && (
+                    <p className="no-records-message">No records found for the selected collections.</p>
+                  )}
+                </>
+              )}
+              
+              {/* Feed records */}
+              {selectedCollections.length === 0 ? (
+                <p className="no-collections-selected">Select at least one collection to see records.</p>
+              ) : (
+                <>
+                  <FeedTimeline 
+                    records={filteredRecords} 
+                    useRkeyTimestamp={useRkeyTimestamp}
+                    loading={loading}
+                  />
+                  
+                  {/* Load more button */}
+                  {filteredRecords.length > 0 && (hasMoreRecordsLocally || hasMoreRecordsRemotely) && (
+                    <div className="load-more-container">
+                      <button 
+                        onClick={handleLoadMore} 
+                        disabled={fetchingMore}
+                        className="load-more-button"
+                      >
+                        {fetchingMore ? 'Loading...' : 'Load More'}
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
       
       {/* Debug button */}
       <div className="debug-controls">

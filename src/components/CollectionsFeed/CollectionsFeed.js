@@ -1105,7 +1105,7 @@ const CollectionsFeed = () => {
               
               {/* Activity Chart */}
               {!chartLoading && filteredChartRecords.length > 0 && (
-                <div className="chart-container">
+                <div className="omni-chart-container">
                   <h3>Activity Timeline</h3>
                   <ActivityChart 
                     records={filteredChartRecords} 

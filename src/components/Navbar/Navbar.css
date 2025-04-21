@@ -170,58 +170,17 @@
 }
 
 /* Button styles */
-.auth-button.login-button {
-  padding: 7px 14px;
-}
+/* Removed .auth-button.login-button styles */
 
-.logout-button {
-  background-color: #dc3545; /* Red background */
-  color: #ffffff; /* White text */
-}
+/* Removed .logout-button styles */
 
-.logout-button:hover {
-  background-color: #c82333; /* Darker red on hover */
-}
+/* Removed .disabled-button styles */
 
-.disabled-button {
-  background-color: gray;
-  color: white;
-  cursor: not-allowed;
-}
+/* Removed .dark-mode .auth-button styles */
 
-.dark-mode .navbar-logo a {
-  color: #f5f5f5; /* Light color for logo */
-}
+/* Removed .dark-mode .login-button styles */
 
-.dark-mode .navbar-links ul li a {
-  color: #f5f5f5; /* Light gray for links */
-}
-
-.dark-mode .navbar-links ul li a:hover {
-  color: #66b2ff; /* Lighter blue on hover */
-}
-
-.dark-mode .auth-button {
-  transition: background-color 0.3s ease, color 0.3s ease;
-}
-
-.dark-mode .login-button {
-  background-color: #3B9AF8; /* Blue background */
-  color: #f5f5f5; /* Light text */
-}
-
-.dark-mode .login-button:hover {
-  background-color: #004F84; /* Darker blue on hover */
-}
-
-.dark-mode .logout-button {
-  background-color: #ff6b6b; /* Light red background */
-  color: #f5f5f5; /* Light text */
-}
-
-.dark-mode .logout-button:hover {
-  background-color: #ff4c4c; /* Darker red on hover */
-}
+/* Removed .dark-mode .logout-button styles */
 
 .navbar-logo {
   display: flex;
@@ -587,46 +546,8 @@
   margin-right: 0.5rem;
 }
 
-.login-button {
-  background-color: #0070f3;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
+/* Removed .login-button styles */
 
-.login-button:hover {
-  background-color: #0060df;
-}
+/* Removed .user-profile-button styles */
 
-.user-profile-button {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  background-color: var(--navbar-background-color);
-  color: var(--text-color);
-  padding: 0.5rem;
-  border-radius: 4px;
-  font-size: 0.875rem;
-}
-
-.logout-button {
-  background-color: transparent;
-  color: var(--text-color);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.logout-button:hover {
-  background-color: rgba(255, 73, 73, 0.1);
-  border-color: #ff4949;
-  color: #ff4949;
-}
+/* Removed .logout-button styles */

@@ -248,7 +248,6 @@ const Navbar = () => {
           {isAuthenticated ? (
             <div className="navbar-auth-container">
               <div className="user-profile-button">
-                <span>{getDisplayName()}</span>
                 <button onClick={handleLogout} className="logout-button">
                   Logout
                 </button>

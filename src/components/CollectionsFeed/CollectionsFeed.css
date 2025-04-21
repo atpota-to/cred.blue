@@ -190,6 +190,10 @@ body.dark-mode .omni-info-card {
     padding: 12px 20px;
   }
 }
+
+.omni-chart-container {
+  position: relative;
+}
   
   /* User Header Styles */
   .user-header {
@@ -932,7 +936,6 @@ body.dark-mode .omni-info-card {
 
 .search-box button {
   padding: 10px 20px;
-  background-color: #3498db;
   color: white;
   border: none;
   border-radius: 4px;

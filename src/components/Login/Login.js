@@ -80,18 +80,15 @@ const Login = () => {
         {error && <div className="login-error">{error}</div>}
         
         <form onSubmit={handleSubmit} className="login-form">
-          <div className="form-group">
-            <label htmlFor="handle">Bluesky Handle</label>
-            <input
-              id="handle"
-              type="text"
-              value={handle}
-              onChange={(e) => setHandle(e.target.value)}
-              placeholder="yourhandle.bsky.social"
-              disabled={isLoading || isAuthenticated}
-              autoFocus
-            />
-          </div>
+          <input
+            id="handle"
+            type="text"
+            value={handle}
+            onChange={(e) => setHandle(e.target.value)}
+            placeholder="yourhandle.bsky.social"
+            disabled={isLoading || isAuthenticated}
+            autoFocus
+          />
           
           <button 
             type="submit" 

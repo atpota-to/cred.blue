@@ -808,23 +808,9 @@
     color: var(--text);
   }
   
-  .login-button {
-    background-color: var(--button-bg);
-    color: var(--button-text);
-    padding: 10px 0;
-    width: 100%;
-    font-size: 16px;
-    margin-top: 10px;
-    font-weight: 700;
-  }
-  
   .admin-container form {
     border: 0px;
     padding: 0px;
-  }
-  
-  .login-button:hover {
-    background-color: #004F84;
   }
   
   .auth-error {

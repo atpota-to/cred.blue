@@ -6,35 +6,35 @@ const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
   const location = useLocation();
 
-  // Simple and direct redirect approach
+  // Use a side effect to check authentication and redirect if needed
   useEffect(() => {
-    // Only check after loading is complete
+    // If we're still loading, wait
     if (loading) {
-      console.log('ProtectedRoute: Still loading auth status...');
+      console.log('ProtectedRoute: Waiting for auth to complete...');
       return;
     }
 
-    // If not authenticated, redirect directly via window.location
+    // If not authenticated, redirect immediately
     if (!isAuthenticated) {
-      console.log('ProtectedRoute: Not authenticated, redirecting to login...');
+      console.log('ProtectedRoute: Not authenticated, forcing redirect to login...');
       const redirectUrl = `/login?returnUrl=${encodeURIComponent(location.pathname + location.search)}`;
-      window.location.href = redirectUrl;
+      
+      // Force redirect - this is the simplest, most reliable approach
+      window.location.replace(redirectUrl);
     } else {
-      console.log('ProtectedRoute: User is authenticated, rendering content');
+      console.log('ProtectedRoute: User is authenticated, allowing access');
     }
-  }, [isAuthenticated, loading, location]);
+  }, [isAuthenticated, loading, location.pathname, location.search]);
 
-  // Show loading state while checking auth
+  // Keep the component simple - only render children if authenticated
   if (loading) {
-    return <div className="auth-loading">Checking authentication status...</div>;
+    return <div className="auth-loading">Checking authentication...</div>;
   }
-
-  // Show redirecting state if not authenticated
+  
   if (!isAuthenticated) {
-    return <div className="auth-redirecting">Redirecting to login...</div>;
+    return <div className="auth-redirecting">Not authenticated - redirecting to login...</div>;
   }
 
-  // User is authenticated, render children
   return children;
 };
 

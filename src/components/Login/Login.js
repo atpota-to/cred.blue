@@ -13,25 +13,30 @@ const Login = () => {
   const queryParams = new URLSearchParams(location.search);
   const returnUrl = queryParams.get('returnUrl') || '/verifier';
 
-  console.log('Login component loaded with returnUrl =', returnUrl);
+  console.log('Login component: returnUrl =', returnUrl);
+
+  // Log auth status to debug
+  useEffect(() => {
+    console.log('Login component auth status:', {
+      isAuthenticated,
+      loading,
+      hasError: !!error,
+      returnUrl
+    });
+  }, [isAuthenticated, loading, error, returnUrl]);
 
   // Handle redirection after successful authentication
   useEffect(() => {
     if (isAuthenticated) {
-      console.log('Login page: User is authenticated, redirecting to:', returnUrl);
+      console.log('Login: User is authenticated, redirecting to', returnUrl);
       
-      // First try React Router navigation
-      navigate(returnUrl, { replace: true });
-      
-      // As a backup, also use direct redirection after a short delay
+      // Set a short delay to ensure state updates complete
       setTimeout(() => {
-        if (window.location.pathname !== returnUrl.split('?')[0]) {
-          console.log('Login page: Using fallback redirect to:', returnUrl);
-          window.location.href = returnUrl;
-        }
-      }, 200);
+        console.log('Login: Executing redirect to', returnUrl);
+        window.location.replace(returnUrl);
+      }, 100);
     }
-  }, [isAuthenticated, navigate, returnUrl]);
+  }, [isAuthenticated, returnUrl]);
 
   const handleInputChange = (event) => {
     setHandle(event.target.value);

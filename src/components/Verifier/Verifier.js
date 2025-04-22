@@ -644,10 +644,24 @@ function Verifier() {
   if (isAuthLoading) return <p>Loading authentication...</p>;
   if (authError) return <p>Authentication Error: {authError}. <a href="/login">Please login</a>.</p>;
   
-  // Simple auth check for debugging - this should never actually render if ProtectedRoute is working
-  if (!session) {
-    console.log('Verifier: Session missing, should be redirected by ProtectedRoute');
-    return <p>You need to be logged in to use the Verifier. Redirecting...</p>;
+  // Direct redirect for unauthenticated users as a backup
+  if (!isAuthenticated) {
+    console.log('Verifier: Detected unauthenticated user, forcing redirect');
+    
+    // Force redirect as an additional failsafe
+    setTimeout(() => {
+      const redirectUrl = `/login?returnUrl=${encodeURIComponent(window.location.pathname)}`;
+      window.location.replace(redirectUrl);
+    }, 100);
+    
+    return <p>Authentication required. Redirecting to login...</p>;
+  }
+
+  // Verify we have a valid session
+  if (!session || !session.did) {
+    console.log('Verifier: Session invalid, forcing redirect');
+    window.location.replace('/login');
+    return <p>Session invalid. Redirecting to login...</p>;
   }
 
   const isAnyOperationInProgress = isVerifying || isRevoking || isLoadingVerifications || isLoadingNetwork || isCheckingValidity;
@@ -657,7 +671,10 @@ function Verifier() {
       <div className="verifier-intro-container">
       <h1>Bluesky Verifier Tool</h1>
       <p className="verifier-intro-text">
-        With Bluesky's new decentralized verification system, anyone can verify anyone else and any Bluesky client can choose which accounts to treat as "Trusted Verifiers". Try verifying an account for yourself or check to see who has verified you! It's as simple as creating a verification record in your PDS that points to the account you want to verify.
+        With Bluesky's new decentralized verification system, anyone can verify anyone else and any Bluesky client can choose which accounts to treat as "Trusted Verifiers".
+      </p>
+      <p className="verifier-intro-text">
+        Try verifying an account for yourself or check to see who has verified you! It's as simple as creating a verification record in your PDS that points to the account you want to verify.
       </p>
       </div>
 

@@ -10,12 +10,12 @@ const Login = () => {
   const location = useLocation();
 
   const queryParams = new URLSearchParams(location.search);
-  const returnUrl = queryParams.get('returnUrl') || '/';
+  const returnUrl = queryParams.get('returnUrl') || '/verifier';
 
   useEffect(() => {
     if (isAuthenticated) {
       console.log('Already authenticated, redirecting from Login page to:', returnUrl);
-      navigate(returnUrl);
+      navigate(returnUrl, { replace: true });
     }
   }, [isAuthenticated, navigate, returnUrl]);
 
@@ -30,30 +30,42 @@ const Login = () => {
   };
 
   if (isAuthenticated) {
-    return <div>Redirecting...</div>;
+    return (
+      <div className="login-container login-status">
+        <p>Already logged in. Redirecting...</p>
+      </div>
+    );
   }
 
   return (
     <div className="login-container">
-      <h1>Login to Cred Blue</h1>
-      <p>Enter your Bluesky handle (e.g., yourname.bsky.social) or leave blank to use bsky.social.</p>
-      <form onSubmit={handleSubmit}>
-        <input
-          type="text"
-          value={handle}
-          onChange={handleInputChange}
-          placeholder="yourname.bsky.social (optional)"
-          aria-label="Bluesky Handle (optional)"
-        />
-        {loading && <p>Processing...</p>}
-        {error && <p className="error-message">Login failed: {error}</p>}
-        <button type="submit" disabled={loading}>
-          {loading ? 'Processing...' : 'Login with Bluesky'}
-        </button>
-      </form>
-      <p className="privacy-note">
-        We use official Bluesky authentication. We don't see or store your password.
-      </p>
+      <div className="login-card">
+        <h1>Login to Cred Blue</h1>
+        <p>Enter your Bluesky handle (e.g., yourname.bsky.social) or leave blank to use bsky.social.</p>
+        <form onSubmit={handleSubmit} className="login-form">
+          <input
+            type="text"
+            value={handle}
+            onChange={handleInputChange}
+            placeholder="yourname.bsky.social (optional)"
+            aria-label="Bluesky Handle (optional)"
+            className="login-input-field"
+            disabled={loading}
+          />
+          {loading && <p className="login-status-message">Processing...</p>}
+          {error && <p className="login-error-message">Login failed: {error}</p>}
+          <button
+            type="submit"
+            disabled={loading}
+            className="login-submit-button"
+          >
+            {loading ? 'Processing...' : 'Login with Bluesky'}
+          </button>
+        </form>
+        <p className="login-privacy-note">
+          We use official Bluesky authentication. We don't see or store your password.
+        </p>
+      </div>
     </div>
   );
 };

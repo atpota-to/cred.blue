@@ -19,8 +19,8 @@ const LoginCallback = () => {
     if (isAuthenticated) {
       console.log('(LoginCallback) Authentication successful, redirecting...');
       // TODO: Implement state parsing for returnUrl if needed
-      const returnUrl = '/'; // Default redirect
-      navigate(returnUrl);
+      const returnUrl = '/verifier'; // Changed redirect target
+      navigate(returnUrl, { replace: true }); // Use replace to avoid callback in history
     } else {
       // If not authenticated after loading, something went wrong
       console.error('(LoginCallback) Authentication failed after loading.');

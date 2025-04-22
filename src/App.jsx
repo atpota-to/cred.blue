@@ -56,7 +56,8 @@ const App = () => {
                 <Route path="/zen" element={<ZenPage />} />
                 <Route path="/methodology" element={<ScoringMethodology />} />
                 
-                {/* Omnifeed Routes - Now Public */}
+                {/* Omnifeed Routes - Temporarily Commented Out */}
+                {/*
                 <Route
                   path="/omnifeed/:username"
                   element={<CollectionsFeed />}
@@ -65,6 +66,7 @@ const App = () => {
                   path="/omnifeed"
                   element={<CollectionsFeed />}
                 />
+                */}
                 
                 {/* Handle both DIDs and regular usernames */}
                 <Route path="/:username" element={<UserProfile />} />

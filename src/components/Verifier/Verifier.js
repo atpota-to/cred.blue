@@ -714,15 +714,12 @@ function Verifier() {
 
       <div className="verifier-section">
          <div style={{display: 'flex', alignItems: 'center', marginBottom: '10px'}}>
-          <h2 style={{ display: 'inline-block', marginRight: '8px', marginBottom: 0, border: 'none', padding: 0 }}>Your Official Verifications</h2>
-          <div className="verifier-tooltip-container">
-            <span className="verifier-tooltip-icon">(?)</span>
-            <span className="verifier-tooltip-text">
-               {trustedVerifiersTooltip}
-            </span>
-          </div>
-        </div>
-        <div>
+          <h2 style={{ display: 'inline-block', marginRight: '0px', marginBottom: '0', border: 'none', padding: '0' }}>Your Official Verifications</h2>
+         </div>
+         <p className="verifier-section-description">
+            Checking if any of Bluesky's Trusted Verifiers have created a verification record for your username.
+         </p>
+         <div>
           {TRUSTED_VERIFIERS.map(verifierId => {
             const status = officialVerifiersStatus[verifierId] || 'idle';
             let message = '...'; let icon = '⏳'; let statusClass = 'verifier-idle-status';
@@ -775,6 +772,10 @@ Check yours: https://cred.blue/verify`;
       </div>
 
       <div className="verifier-section">
+        <div className="verifier-list-header">
+          <h2>Accounts You've Verified</h2>
+          <button onClick={fetchVerifications} disabled={isAnyOperationInProgress} className="verifier-action-button verifier-refresh-button">Refresh List</button>
+        </div>
 
         {revokeStatusMessage && (
           <div className={`verifier-status-box ${revokeStatusMessage.includes('failed') ? 'verifier-status-box-error' : 'verifier-status-box-success'}`}>

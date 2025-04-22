@@ -262,7 +262,10 @@ function Verifier() {
           const isMutual = mutualsSet.has(did);
           const isFollow = followsSet.has(did);
           const pdsEndpoint = await getPdsEndpoint(did);
-          if (!pdsEndpoint) return;
+          if (!pdsEndpoint) {
+             console.warn(`Skipping verification check for ${profile?.handle || did} (no PDS found).`);
+             return;
+          }
 
           let foundVerificationForMe = null;
           let hasVerifiedAnyone = false;

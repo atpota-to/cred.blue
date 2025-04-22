@@ -266,6 +266,7 @@ const Navbar = () => {
             </div>
           )}
           
+          {/* Comment out the support button container
           <div className="navbar-support-button-container">
             <button
               className="navbar-support-button"
@@ -275,6 +276,7 @@ const Navbar = () => {
               Upgrade
             </button>
           </div>
+          */}
         </div>
       </div>
     </header>

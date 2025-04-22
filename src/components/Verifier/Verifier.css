@@ -322,18 +322,88 @@
 
 /* Official Verifier Status */
 .verifier-official-verifier-tooltip {
-  cursor: help;
+  /* Remove old styles for this if they existed, or repurpose if needed */
+}
+
+/* New Tooltip Styles */
+.verifier-tooltip-container {
+  position: relative;
   display: inline-block;
-  margin-left: 5px;
-  font-weight: bold;
-  border: 1px solid var(--text-muted, #ccc);
-  border-radius: 50%;
-  width: 1.2em;
-  height: 1.2em;
-  line-height: 1.2em;
-  text-align: center;
-  font-size: 0.8em; /* Smaller question mark */
+  margin-left: 5px; /* Keep spacing */
+}
+
+.verifier-tooltip-icon {
+  display: inline-block;
+  background-color: var(--card-border); /* Use a subtle background */
   color: var(--text-muted, var(--text));
+  border-radius: 50%;
+  width: 1.4em; /* Adjust size */
+  height: 1.4em;
+  line-height: 1.4em; /* Center text vertically */
+  text-align: center;
+  font-size: 0.8em;
+  font-weight: bold;
+  cursor: help;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.verifier-tooltip-icon:hover {
+  background-color: var(--button-bg); /* Use button color on hover */
+  color: var(--button-text);
+}
+
+.verifier-tooltip-text {
+  visibility: hidden;
+  opacity: 0;
+  width: 250px; /* Adjust width as needed */
+  background-color: var(--tooltip-bg, #333); /* Use variable or default */
+  color: var(--tooltip-text, #fff);
+  text-align: center;
+  border-radius: 6px;
+  padding: 8px 12px;
+  position: absolute;
+  z-index: 10;
+  bottom: 135%; /* Position above the icon */
+  left: 50%;
+  margin-left: -125px; /* Half of the width to center */
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  font-size: 0.9em; /* Adjust font size */
+  line-height: 1.4;
+}
+
+/* Tooltip arrow */
+.verifier-tooltip-text::after {
+  content: "";
+  position: absolute;
+  top: 100%; /* At the bottom of the tooltip */
+  left: 50%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: var(--tooltip-bg, #333) transparent transparent transparent; /* Arrow pointing down */
+}
+
+.verifier-tooltip-container:hover .verifier-tooltip-text {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* Dark mode tooltip adjustments */
+.dark-mode .verifier-tooltip-icon {
+  background-color: var(--card-border-dark, #555); /* Adjust dark variable */
+  color: var(--text-muted-dark, var(--text));
+}
+.dark-mode .verifier-tooltip-icon:hover {
+   background-color: var(--button-bg); /* Keep button colors */
+   color: var(--button-text);
+}
+.dark-mode .verifier-tooltip-text {
+   background-color: var(--tooltip-bg-dark, #eee);
+   color: var(--tooltip-text-dark, #333);
+}
+.dark-mode .verifier-tooltip-text::after {
+   border-top-color: var(--tooltip-bg-dark, #eee); /* Match dark background */
 }
 
 .verifier-official-verifier-note {

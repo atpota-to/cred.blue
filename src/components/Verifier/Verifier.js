@@ -655,11 +655,7 @@ function Verifier() {
       <p className="verifier-intro-text">
         With Bluesky's new decentralized verification system, anyone can verify anyone else and any Bluesky client can choose which accounts to treat as "Trusted Verifiers". It's a first-of-its-kind verification system for a mainstream social platform of this size. Try verifying an account for yourself or check to see who has verified you!
       </p>
-      <div className="verifier-page-header">
-        <p className="verifier-user-info">Logged in as: {userInfo ? `${userInfo.displayName} (@${userInfo.handle})` : session?.did}</p>
-        <button onClick={signOut} disabled={isAnyOperationInProgress} className="verifier-sign-out-button">Sign Out</button>
-      </div>
-      <hr />
+
 
       <div className="verifier-section">
         <h2>Verify a Bluesky User</h2>
@@ -719,7 +715,12 @@ function Verifier() {
       <div className="verifier-section">
          <div style={{display: 'flex', alignItems: 'center', marginBottom: '10px'}}>
           <h2 style={{ display: 'inline-block', marginRight: '8px', marginBottom: 0, border: 'none', padding: 0 }}>Your Verification Status</h2>
-          <span title={trustedVerifiersTooltip} className="verifier-official-verifier-tooltip" style={{ fontSize: '1.2em' }}>(?)</span>
+          <div className="verifier-tooltip-container">
+            <span className="verifier-tooltip-icon">(?)</span>
+            <span className="verifier-tooltip-text">
+               {trustedVerifiersTooltip}
+            </span>
+          </div>
         </div>
         <div>
           {TRUSTED_VERIFIERS.map(verifierId => {

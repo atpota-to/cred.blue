@@ -7,7 +7,6 @@
   margin: 20px auto;
   padding: 20px;
   color: var(--text);
-  background-color: var(--background);
 }
 
 .verifier-container h1,
@@ -254,6 +253,11 @@
   font-weight: bold;
   font-size: 1.05em;
   margin-right: 5px;
+}
+
+/* Add dark mode color for display name */
+.dark-mode .verifier-display-name {
+  color: #3b9af8; /* Light blue for dark mode */
 }
 
 .verifier-network-results p {

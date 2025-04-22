@@ -655,12 +655,21 @@ function Verifier() {
                  <p>{networkVerifications.followsVerifiedAnyone} of the {networkVerifications.fetchedFollowsCount} accounts you follow have verified others.</p>
             </div>
             {(() => {
+              // Helper for pluralization
+              const pluralize = (count, singular, plural) => count === 1 ? singular : plural;
+              const mutualsVerifiedMeCount = networkVerifications.mutualsVerifiedMe.length;
+              const followsVerifiedMeCount = networkVerifications.followsVerifiedMe.length;
+              const mutualsVerifiedAnyoneCount = networkVerifications.mutualsVerifiedAnyone;
+              const followsVerifiedAnyoneCount = networkVerifications.followsVerifiedAnyone;
+              const fetchedMutualsCount = networkVerifications.fetchedMutualsCount;
+              const fetchedFollowsCount = networkVerifications.fetchedFollowsCount;
+
               const statsText = `My verification stats:
 
-${networkVerifications.mutualsVerifiedMe.length} mutuals verified me,
-${networkVerifications.followsVerifiedMe.length} follows verified me,
-${networkVerifications.mutualsVerifiedAnyone}/${networkVerifications.fetchedMutualsCount} mutuals verified others,
-${networkVerifications.followsVerifiedAnyone}/${networkVerifications.fetchedFollowsCount} follows verified others,
+${mutualsVerifiedMeCount} ${pluralize(mutualsVerifiedMeCount, 'mutual', 'mutuals')} verified me,
+${followsVerifiedMeCount} ${pluralize(followsVerifiedMeCount, 'follow', 'follows')} verified me,
+${mutualsVerifiedAnyoneCount}/${fetchedMutualsCount} ${pluralize(fetchedMutualsCount, 'mutual', 'mutuals')} verified others,
+${followsVerifiedAnyoneCount}/${fetchedFollowsCount} ${pluralize(fetchedFollowsCount, 'follow', 'follows')} verified others,
 
 Check yours: https://cred.blue/verifier`;
               const encodedStatsText = encodeURIComponent(statsText);

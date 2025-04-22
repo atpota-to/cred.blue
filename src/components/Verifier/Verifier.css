@@ -3,7 +3,7 @@
 /* General container */
 .verifier-container {
   font-family: "articulat-cf", sans-serif;
-  max-width: 800px; /* Adjust as needed */
+  max-width: 450px; /* Adjust as needed */
   margin: 20px auto;
   padding: 20px;
   color: var(--text);
@@ -19,6 +19,9 @@
 
 .verifier-container h1 {
   font-size: 2em; /* Adjust */
+}
+.verifier-intro-container {
+  margin-bottom: 20px;
 }
 
 .verifier-container h2 {
@@ -193,6 +196,7 @@
   padding: 15px;
   border-radius: 6px;
   margin-top: 15px;
+  margin-bottom: 15px;
   text-align: center;
   border: 1px solid transparent; /* Base border */
   transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
@@ -211,6 +215,11 @@
   color: var(--success-text, #155724);
   font-weight: bold;
   text-decoration: underline;
+}
+
+.verifier-status-box p {
+  margin:
+0px;
 }
 
 /* Dark Mode Status Box Styles */
@@ -313,17 +322,22 @@
   margin: 10px 0;
 }
 .verifier-network-results {
-  margin-top: 15px;
+  margin-top: 0px;
 }
 .verifier-network-results .verifier-verifier-list {
   margin-bottom: 15px; /* Space between lists */
 }
+
+.verifier-additional-context p {
+  margin-top: 0px;
+}
+
 .verifier-additional-context {
   font-size: 0.9em;
   color: var(--text-muted, var(--text));
   margin-top: 15px;
   border-top: 1px dashed var(--card-border);
-  padding-top: 10px;
+  padding-top: 17px;
 }
 .verifier-share-stats-link {
   display: inline-block;

@@ -11,45 +11,63 @@ const TRUSTED_VERIFIERS = [
   'theathletic.bsky.social'
 ];
 
-// Helper function to fetch all paginated results using a specific agent instance
-async function fetchAllPaginated(agentInstance, apiMethod, initialParams) {
+// Helper function modified to handle direct fetch or agent calls
+// Now accepts an optional 'useDirectFetch' flag and the direct URL if needed
+async function fetchAllPaginated(agentInstance, apiMethod, initialParams, useDirectFetch = false, directUrl = null) {
   let results = [];
   let cursor = initialParams.cursor;
-  const params = { ...initialParams };
-  // Attempt to log the intended operation more reliably
-  const operationName = apiMethod.name.includes('bound ') ? apiMethod.name.split('bound ')[1].trim() : apiMethod.name;
-  console.log(`fetchAllPaginated: Starting ${operationName} with params:`, initialParams);
+  const params = { ...initialParams }; // Copy initial params
+  // Determine operation name
+  const operationName = apiMethod ? (apiMethod.name.includes('bound ') ? apiMethod.name.split('bound ')[1].trim() : apiMethod.name) : (directUrl || 'directFetch');
+  console.log(`fetchAllPaginated: Starting ${operationName} with initialParams:`, initialParams);
+
+  let currentUrl = directUrl; // Use direct URL if provided
 
   do {
     try {
-      if (cursor) {
-        params.cursor = cursor;
-      }
-      // Call the method. Assumes namespaced methods return { data: { records: [], cursor: '...' } }
-      // or similar structure where records are in an array under `data`.
-      const response = await apiMethod(params);
-
-      // Check if response and response.data exist
-      if (!response || !response.data) {
-        console.warn(`fetchAllPaginated: Invalid response structure for ${operationName}`, response);
-        break; // Stop pagination if structure is unexpected
-      }
-
-      // Find the key containing the array of results (e.g., 'records', 'follows', 'followers', 'actors')
-      const listKey = Object.keys(response.data).find(key => Array.isArray(response.data[key]));
-
-      if (listKey && response.data[listKey]) {
-        results = results.concat(response.data[listKey]);
+      let responseData;
+      if (useDirectFetch && currentUrl) {
+        // Handle pagination for direct fetch
+        const url = new URL(currentUrl);
+        if (cursor) {
+          url.searchParams.set('cursor', cursor);
+        }
+        // Add other params like limit (ensure initialParams doesn't duplicate)
+        Object.entries(params).forEach(([key, value]) => {
+           if (key !== 'cursor' && !url.searchParams.has(key)) {
+              url.searchParams.set(key, value);
+           }
+        });
+        // console.log(`fetchAllPaginated: Direct fetch URL: ${url.toString()}`);
+        const response = await fetch(url.toString());
+        if (!response.ok) throw new Error(`HTTP error ${response.status}`);
+        responseData = await response.json();
+      } else if (apiMethod) {
+        // Use agent method
+        if (cursor) {
+          params.cursor = cursor;
+        }
+        const response = await apiMethod(params);
+        if (!response || !response.data) {
+            console.warn(`fetchAllPaginated: Invalid agent response for ${operationName}`, response);
+            break;
+        }
+        responseData = response.data;
       } else {
-          console.warn(`fetchAllPaginated: Could not find results array key in response.data for ${operationName}`, response.data);
+         console.error("fetchAllPaginated: Called without agent method or direct URL");
+         break;
       }
 
-      cursor = response.data.cursor;
-      // console.log(`fetchAllPaginated: Fetched page for ${operationName}, got ${response.data[listKey]?.length || 0} items, cursor: ${cursor}`);
+      // Find results array
+      const listKey = Object.keys(responseData).find(key => Array.isArray(responseData[key]));
+      if (listKey && responseData[listKey]) {
+        results = results.concat(responseData[listKey]);
+      }
+      cursor = responseData.cursor;
 
     } catch (error) {
       console.error(`Error during paginated fetch for ${operationName}:`, error);
-      cursor = undefined; // Stop pagination on error
+      cursor = undefined;
     }
   } while (cursor);
 
@@ -268,14 +286,20 @@ function Verifier() {
     setNetworkVerifications({ mutualsVerifiedMe: [], followsVerifiedMe: [], mutualsVerifiedAnyone: 0, followsVerifiedAnyone: 0, fetchedMutualsCount: 0, fetchedFollowsCount: 0 });
     setNetworkStatusMessage("Fetching network lists (mutuals, follows)...");
 
-    const publicAgent = new Agent({ service: 'https://public.api.bsky.app' });
-
     try {
-      console.log("checkNetworkVerifications: Fetching follows and mutuals...");
-      // Ensure correct agent and bound namespaced methods are used
+      console.log("checkNetworkVerifications: Fetching follows (public) and mutuals (authenticated)...");
+
+      // *** Fetch follows using direct fetch ***
+      const followsUrl = `https://public.api.bsky.app/xrpc/app.bsky.graph.getFollows`;
+      const followsParams = { actor: session.did, limit: 100 };
+
+      // *** Fetch known followers using authenticated agent ***
+      const knownFollowersMethod = agent.api.app.bsky.graph.getKnownFollowers.bind(agent.api.app.bsky.graph);
+      const knownFollowersParams = { actor: session.did, limit: 100 };
+
       const [follows, mutuals] = await Promise.all([
-        fetchAllPaginated(publicAgent, publicAgent.api.app.bsky.graph.getFollows.bind(publicAgent.api.app.bsky.graph), { actor: session.did, limit: 100 }),
-        fetchAllPaginated(agent, agent.api.app.bsky.graph.getKnownFollowers.bind(agent.api.app.bsky.graph), { actor: session.did, limit: 100 })
+        fetchAllPaginated(null, null, followsParams, true, followsUrl),
+        fetchAllPaginated(agent, knownFollowersMethod, knownFollowersParams)
       ]);
 
       console.log(`checkNetworkVerifications: Fetched ${follows.length} follows, ${mutuals.length} mutuals.`);
@@ -315,17 +339,20 @@ function Verifier() {
             return null;
           }
 
-          // Create a temporary agent specifically for this user's PDS
-          const tempUserAgent = new Agent({ service: pdsEndpoint });
           let foundVerificationForMe = null;
           let hasVerifiedAnyone = false;
 
           try {
-            // Use fetchAllPaginated to handle listing records from the specific PDS
+            // *** Use fetchAllPaginated with direct fetch for listRecords ***
+            const listRecordsUrl = `${pdsEndpoint}/xrpc/com.atproto.repo.listRecords`;
+            const listRecordsParams = { repo: did, collection: 'app.bsky.graph.verification', limit: 100 };
+
             const verificationRecords = await fetchAllPaginated(
-              tempUserAgent, 
-              tempUserAgent.api.com.atproto.repo.listRecords.bind(tempUserAgent.api.com.atproto.repo), // Bind namespaced method
-              { repo: did, collection: 'app.bsky.graph.verification', limit: 100 }
+              null,
+              null,
+              listRecordsParams,
+              true, // Use direct fetch
+              listRecordsUrl
             );
 
             if (verificationRecords.length > 0) {
@@ -337,8 +364,7 @@ function Verifier() {
               }
             }
           } catch (err) {
-             // fetchAllPaginated already logs errors, just skip this user on error
-             console.warn(`Error processing records for ${profile.handle || did} on ${pdsEndpoint}`);
+             console.warn(`Error processing records for ${profile?.handle || did} on ${pdsEndpoint}:`, err);
           }
           
           // Return data for aggregation
@@ -387,7 +413,7 @@ function Verifier() {
       setIsLoadingNetwork(false);
       setNetworkChecked(true);
     }
-  }, [agent, session, userInfo]); // Keep dependencies
+  }, [agent, session, userInfo]);
 
   useEffect(() => {
     if (agent) {

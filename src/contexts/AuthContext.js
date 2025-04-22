@@ -46,6 +46,7 @@ export const AuthProvider = ({ children }) => {
         const oauthClient = new BrowserOAuthClient({
           clientMetadata: clientMetadata,
           handleResolver: 'https://bsky.social', // Use Bluesky's resolver or your own
+          scope: 'atproto transition:generic'
         });
 
         setClient(oauthClient); // Store the client instance

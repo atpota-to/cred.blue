@@ -9,6 +9,9 @@ import MatterLoadingAnimation from '../MatterLoadingAnimation';
 import { Helmet } from 'react-helmet';
 import { useAuth } from '../../contexts/AuthContext';
 
+// Define the backend API base URL
+const API_BASE_URL = 'https://api.cred.blue';
+
 const CollectionsFeed = () => {
   const { username } = useParams();
   const navigate = useNavigate();
@@ -145,8 +148,8 @@ const CollectionsFeed = () => {
         const maxPages = isInitialDeepLoad ? 1000 : 1; 
         
         while (hasMoreRecords && pageCount < maxPages && !reachedCutoff) {
-          // Use our server-side API to fetch records
-          let url = `/api/collections/${encodeURIComponent(userDid)}/records?endpoint=${encodeURIComponent(endpoint)}&collection=${encodeURIComponent(collection)}&limit=100`;
+          // Use our server-side API to fetch records - Use absolute URL
+          let url = `${API_BASE_URL}/api/collections/${encodeURIComponent(userDid)}/records?endpoint=${encodeURIComponent(endpoint)}&collection=${encodeURIComponent(collection)}&limit=100`;
           
           // Add cursor if we have one
           if (cursor) {
@@ -385,9 +388,9 @@ const CollectionsFeed = () => {
         // Continue without profile data, not critical
       }
       
-      // Use our server-side API to fetch collections
+      // Use our server-side API to fetch collections - Use absolute URL
       try {
-        const collectionsResponse = await fetch(`/api/collections/${encodeURIComponent(userDid)}?endpoint=${encodeURIComponent(endpoint)}`);
+        const collectionsResponse = await fetch(`${API_BASE_URL}/api/collections/${encodeURIComponent(userDid)}?endpoint=${encodeURIComponent(endpoint)}`);
         
         if (!collectionsResponse.ok) {
           throw new Error(`Error fetching collections: ${collectionsResponse.statusText}`);
@@ -569,8 +572,8 @@ const CollectionsFeed = () => {
           // Process each selected collection sequentially
           for (const collection of selectedCollections) {
             try {
-              // Use server-side API endpoint for fetching records
-              const url = `/api/collections/${encodeURIComponent(did)}/records?endpoint=${encodeURIComponent(serviceEndpoint)}&collection=${encodeURIComponent(collection)}&limit=25`;
+              // Use server-side API endpoint for fetching records - Use absolute URL
+              const url = `${API_BASE_URL}/api/collections/${encodeURIComponent(did)}/records?endpoint=${encodeURIComponent(serviceEndpoint)}&collection=${encodeURIComponent(collection)}&limit=25`;
               
               const response = await fetch(url);
               
@@ -700,11 +703,11 @@ const CollectionsFeed = () => {
     }
   };
   
-  // Add a function to fetch debug info
+  // Add a function to fetch debug info - Use absolute API URL
   const fetchDebugInfo = async () => {
     try {
-      const response = await fetch('/api/debug/session', {
-        credentials: 'include'
+      const response = await fetch(`${API_BASE_URL}/api/debug/session`, { // Use absolute URL
+        credentials: 'include' // Keep credentials if needed for debug endpoint
       });
       
       if (!response.ok) {

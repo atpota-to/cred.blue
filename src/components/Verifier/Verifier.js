@@ -640,14 +640,14 @@ function Verifier() {
     inputRef.current?.focus();
   };
 
+  // Handle loading and error states
   if (isAuthLoading) return <p>Loading authentication...</p>;
   if (authError) return <p>Authentication Error: {authError}. <a href="/login">Please login</a>.</p>;
   
-  // Check authentication after all hooks are defined
+  // Simple auth check for debugging - this should never actually render if ProtectedRoute is working
   if (!session) {
-    console.log('Verifier: Not authenticated, waiting for ProtectedRoute redirection');
-    // Show a brief loading message while ProtectedRoute handles redirection
-    return <p>Checking authentication status...</p>;
+    console.log('Verifier: Session missing, should be redirected by ProtectedRoute');
+    return <p>You need to be logged in to use the Verifier. Redirecting...</p>;
   }
 
   const isAnyOperationInProgress = isVerifying || isRevoking || isLoadingVerifications || isLoadingNetwork || isCheckingValidity;

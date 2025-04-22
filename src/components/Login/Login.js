@@ -13,13 +13,23 @@ const Login = () => {
   const queryParams = new URLSearchParams(location.search);
   const returnUrl = queryParams.get('returnUrl') || '/verifier';
 
-  console.log('Login component loaded, returnUrl =', returnUrl);
+  console.log('Login component loaded with returnUrl =', returnUrl);
 
+  // Handle redirection after successful authentication
   useEffect(() => {
-    // If already authenticated, redirect to returnUrl
     if (isAuthenticated) {
-      console.log('Already authenticated, redirecting from Login page to:', returnUrl);
+      console.log('Login page: User is authenticated, redirecting to:', returnUrl);
+      
+      // First try React Router navigation
       navigate(returnUrl, { replace: true });
+      
+      // As a backup, also use direct redirection after a short delay
+      setTimeout(() => {
+        if (window.location.pathname !== returnUrl.split('?')[0]) {
+          console.log('Login page: Using fallback redirect to:', returnUrl);
+          window.location.href = returnUrl;
+        }
+      }, 200);
     }
   }, [isAuthenticated, navigate, returnUrl]);
 
@@ -31,20 +41,22 @@ const Login = () => {
     event.preventDefault();
     console.log(`Login attempt for handle: ${handle || 'default PDS'}, returnUrl: ${returnUrl}`);
     
-    // Call the login function from AuthContext
-    // The returnUrl is passed so the user can be redirected after successful login
     try {
+      // Store the returnUrl in localStorage as a backup
+      localStorage.setItem('auth_redirect_url', returnUrl);
+      
+      // Call the login function from AuthContext
       await login(handle || null, returnUrl);
     } catch (err) {
       console.error('Login error:', err);
-      // Error handling is done through the AuthContext error state
     }
   };
 
+  // If already authenticated, show a message while redirecting
   if (isAuthenticated) {
     return (
       <div className="login-container login-status">
-        <p>Already logged in. Redirecting...</p>
+        <p>Already logged in. Redirecting to {returnUrl}...</p>
       </div>
     );
   }

@@ -304,6 +304,10 @@
   margin-right: 5px;
 }
 
+.verifier-network-results p {
+  margin: 0px;
+}
+
 /* Validity status indicators */
 .verifier-validity-status {
   display: inline-block;
@@ -387,9 +391,6 @@
 }
 .verifier-network-results {
   margin-top: 0px;
-}
-.verifier-network-results .verifier-verifier-list {
-  margin-bottom: 15px; /* Space between lists */
 }
 
 .verifier-additional-context p {

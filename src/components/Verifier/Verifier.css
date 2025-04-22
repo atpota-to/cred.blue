@@ -108,6 +108,7 @@
   flex-wrap: wrap; /* Allow wrapping */
   padding: 0px;
   border: 0px;
+  position: relative; /* Added for suggestion list positioning */
 }
 
 .verifier-input-field {
@@ -129,63 +130,6 @@
   border-color: var(--button-bg);
   background-color: var(--background); /* Match main app focus */
   outline: none;
-}
-
-/* Autocomplete Styles */
-.verifier-suggestions-list {
-  position: absolute;
-  top: 100%; /* Position below input */
-  left: 0;
-  right: 0;
-  background-color: var(--navbar-bg);
-  border: 1px solid var(--card-border);
-  border-top: none; /* Avoid double border */
-  border-radius: 0 0 6px 6px;
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  max-height: 200px;
-  overflow-y: auto;
-  z-index: 10;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-}
-
-.verifier-suggestion-item {
-  display: flex;
-  align-items: center;
-  padding: 10px;
-  cursor: pointer;
-  border-bottom: 1px solid var(--card-border);
-}
-.verifier-suggestion-item:last-child {
-  border-bottom: none;
-}
-
-.verifier-suggestion-item:hover {
-  background-color: var(--background); /* Use main background for hover */
-}
-
-.verifier-suggestion-avatar {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  margin-right: 10px;
-  object-fit: cover;
-}
-
-.verifier-suggestion-text {
-  display: flex;
-  flex-direction: column;
-}
-
-.verifier-suggestion-display-name {
-  font-weight: bold;
-  color: var(--text);
-}
-
-.verifier-suggestion-handle {
-  font-size: 0.9em;
-  color: var(--text-muted, var(--text));
 }
 
 /* Status Box */

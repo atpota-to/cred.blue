@@ -705,22 +705,20 @@ function Verifier() {
             </button>
           </form>
           {showSuggestions && (suggestions.length > 0 || isFetchingSuggestions) && (
-            <ul className="verifier-suggestions-list" ref={suggestionsRef}>
+            <ul className="autocomplete-items" ref={suggestionsRef}>
               {isFetchingSuggestions && suggestions.length === 0 ? (
-                 <li className="verifier-suggestion-item">Loading...</li>
+                 <li className="autocomplete-item">Loading...</li>
               ) : (
                 suggestions.map((actor) => (
-                  <li key={actor.did} className="verifier-suggestion-item" onMouseDown={(e) => { e.preventDefault(); handleSuggestionClick(actor.handle); }}>
-                    <img src={actor.avatar} alt="" className="verifier-suggestion-avatar" />
-                    <div className="verifier-suggestion-text">
-                      <span className="verifier-suggestion-display-name">{actor.displayName || actor.handle}</span>
-                      <span className="verifier-suggestion-handle">@{actor.handle}</span>
-                    </div>
+                  <li key={actor.did} className="autocomplete-item" onMouseDown={(e) => { e.preventDefault(); handleSuggestionClick(actor.handle); }}>
+                    <img src={actor.avatar} alt="" />
+                    <span className="verifier-suggestion-display-name">{actor.displayName || actor.handle}</span>
+                    <span className="verifier-suggestion-handle">@{actor.handle}</span>
                   </li>
                 ))
               )}
               {suggestions.length === 0 && !isFetchingSuggestions && targetHandle.length >= 2 && (
-                 <li className="verifier-suggestion-item">No users found matching "{targetHandle}"</li>
+                 <li className="autocomplete-item">No users found matching "{targetHandle}"</li>
               )}
             </ul>
           )}

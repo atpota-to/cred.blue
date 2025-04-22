@@ -146,8 +146,8 @@ function Verifier() {
       setAgent(agentInstance);
 
       // Fetch logged-in user's profile info using the authenticated API
-      // Use the agent's built-in DID reference after initialization
-      agentInstance.getProfile({ actor: agentInstance.session.did })
+      // Use the DID directly from the session object from useAuth()
+      agentInstance.getProfile({ actor: session.did })
         .then(res => {
           console.log('Logged-in user profile fetched successfully:', res.data);
           setUserInfo(res.data);

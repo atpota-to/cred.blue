@@ -45,6 +45,7 @@ export const AuthProvider = ({ children }) => {
         // Create the client instance
         const oauthClient = new BrowserOAuthClient({
           clientMetadata: clientMetadata,
+          plcDirectoryUrl: 'https://plc.directory',
         });
 
         setClient(oauthClient); // Store the client instance

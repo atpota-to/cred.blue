@@ -9,10 +9,14 @@ const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Extract returnUrl from query parameters
   const queryParams = new URLSearchParams(location.search);
   const returnUrl = queryParams.get('returnUrl') || '/verifier';
 
+  console.log('Login component loaded, returnUrl =', returnUrl);
+
   useEffect(() => {
+    // If already authenticated, redirect to returnUrl
     if (isAuthenticated) {
       console.log('Already authenticated, redirecting from Login page to:', returnUrl);
       navigate(returnUrl, { replace: true });
@@ -26,7 +30,15 @@ const Login = () => {
   const handleSubmit = async (event) => {
     event.preventDefault();
     console.log(`Login attempt for handle: ${handle || 'default PDS'}, returnUrl: ${returnUrl}`);
-    await login(handle || null, returnUrl);
+    
+    // Call the login function from AuthContext
+    // The returnUrl is passed so the user can be redirected after successful login
+    try {
+      await login(handle || null, returnUrl);
+    } catch (err) {
+      console.error('Login error:', err);
+      // Error handling is done through the AuthContext error state
+    }
   };
 
   if (isAuthenticated) {
@@ -56,7 +68,7 @@ const Login = () => {
           {error && <p className="login-error-message">Login failed: {error}</p>}
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || isAuthenticated}
             className="login-submit-button"
           >
             {loading ? 'Processing...' : 'Login with Bluesky'}

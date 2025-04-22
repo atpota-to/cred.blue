@@ -1,23 +1,33 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, authLoading } = useAuth(); // Assuming 'authLoading' is the correct name from context
+  const { isAuthenticated, loading, session } = useAuth();
   const location = useLocation();
 
-  if (authLoading) {
-    // Optional: Display a loading indicator while checking auth status
-    return <div>Loading authentication status...</div>;
+  useEffect(() => {
+    console.log('ProtectedRoute:', { 
+      isAuthenticated, 
+      loading, 
+      hasDid: session?.did ? true : false,
+      path: location.pathname
+    });
+  }, [isAuthenticated, loading, session, location]);
+
+  // Only show loading state when actively checking auth
+  if (loading) {
+    console.log('ProtectedRoute: Auth is still loading');
+    return <div>Checking authentication status...</div>;
   }
 
+  // If not authenticated, redirect to login
   if (!isAuthenticated) {
-    // User not logged in, redirect to login page
-    // Preserve the original intended location in the state
-    return <Navigate to={`/login?returnUrl=${location.pathname}${location.search}`} replace />;
+    console.log('ProtectedRoute: Not authenticated, redirecting to login');
+    return <Navigate to={`/login?returnUrl=${encodeURIComponent(location.pathname + location.search)}`} replace />;
   }
 
-  // User is authenticated, render the child component
+  console.log('ProtectedRoute: Authentication confirmed, rendering protected content');
   return children;
 };
 

@@ -51,7 +51,13 @@ export const AuthProvider = ({ children }) => {
         setClient(oauthClient); // Store the client instance
 
         // Initialize the client - this handles callbacks and session restoration
+        console.log('(AuthProvider) Initializing OAuth client...');
         const initResult = await oauthClient.init();
+        console.log('(AuthProvider) Init result:', { 
+          hasSession: !!initResult?.session,
+          hasState: !!initResult?.state,
+          did: initResult?.session?.did 
+        });
 
         if (initResult?.session) {
           setSession(initResult.session);
@@ -68,7 +74,7 @@ export const AuthProvider = ({ children }) => {
         }
       } catch (err) {
         console.error('(AuthProvider) Error initializing client or handling callback:', err);
-        setError('Initialization failed. Please try refreshing.');
+        setError('Authentication initialization failed. Please try refreshing.');
         setSession(null);
       } finally {
         setLoading(false);
@@ -86,7 +92,7 @@ export const AuthProvider = ({ children }) => {
       setError("Client not initialized.");
       return;
     }
-    console.log(`(AuthProvider) Initiating client-side login for handle: ${handle || 'none specified'}`);
+    console.log(`(AuthProvider) Initiating client-side login for handle: ${handle || 'none specified'}, returnUrl: ${returnUrl}`);
     try {
       // The state can be used to pass information through the redirect, like the return URL
       const stateData = JSON.stringify({ returnUrl });
@@ -104,7 +110,11 @@ export const AuthProvider = ({ children }) => {
 
   // Updated Logout function - uses session.signOut()
   const logout = useCallback(async () => {
-     if (!session) return;
+     if (!session) {
+       console.log('(AuthProvider) No active session to log out');
+       return;
+     }
+     
      console.log('(AuthProvider) Logging out...');
      try {
         await session.signOut(); // Use session's signOut method
@@ -120,6 +130,16 @@ export const AuthProvider = ({ children }) => {
        window.location.href = '/'; // Force reload
      }
   }, [session]);
+
+  // Debug effect to log auth state changes
+  useEffect(() => {
+    console.log('(AuthProvider) Auth state updated:', {
+      isAuthenticated: !!session,
+      did: session?.did || null,
+      loading,
+      hasError: !!error
+    });
+  }, [session, loading, error]);
 
   return (
     <AuthContext.Provider

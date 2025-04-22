@@ -240,6 +240,10 @@
   border-bottom: none; /* Explicitly remove border here */
 }
 
+.verifier-list {
+  margin-top: 15px;
+}
+
 .verifier-list,
 .verifier-verifier-list {
   list-style: none;

@@ -17,7 +17,7 @@ const clientMetadata = {
   client_uri: domain,
   redirect_uris: [`https://testing.cred.blue/login/callback`],
   logo_uri: `https://testing.cred.blue/favicon.ico`,
-  scope: "atproto",
+  scope: "atproto transition:generic",
   grant_types: ["authorization_code", "refresh_token"],
   response_types: ["code"],
   token_endpoint_auth_method: "none",

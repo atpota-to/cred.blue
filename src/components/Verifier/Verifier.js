@@ -595,7 +595,7 @@ function Verifier() {
               type="text"
               value={targetHandle}
               onChange={(e) => setTargetHandle(e.target.value)}
-              placeholder="targetuser.bsky.social"
+              placeholder="username.bsky.social"
               disabled={isAnyOperationInProgress}
               required
               className="verifier-input-field"

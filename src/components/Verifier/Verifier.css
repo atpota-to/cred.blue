@@ -122,6 +122,7 @@
   transition: all 0.3s ease;
   font-family: inherit; /* Use main font */
   min-width: 200px; /* Ensure minimum width */
+  margin: 0px;
 }
 
 .verifier-input-field:hover,

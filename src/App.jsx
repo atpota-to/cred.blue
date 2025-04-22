@@ -21,6 +21,7 @@ import CompareScores from './components/CompareScores/CompareScores';
 import CollectionsFeed from './components/CollectionsFeed/CollectionsFeed';
 import Login from './components/Login/Login';
 import LoginCallback from './components/Login/LoginCallback';
+import Verifier from './components/Verifier/Verifier';
 import { AuthProvider } from './contexts/AuthContext';
 import "./App.css";
 
@@ -50,6 +51,7 @@ const App = () => {
                 <Route path="/definitions" element={<Definitions />} />
                 <Route path="/leaderboard" element={<Leaderboard />} />
                 <Route path="/resources" element={<Resources />} />
+                <Route path="/verifier" element={<Verifier />} />
                 <Route path="/shortcut" element={<Shortcut />} />
                 <Route path="/zen" element={<ZenPage />} />
                 <Route path="/methodology" element={<ScoringMethodology />} />

@@ -1,0 +1,331 @@
+/* frontend-cred-blue/src/components/Verifier/Verifier.css */
+
+/* General container */
+.verifier-container {
+  font-family: "articulat-cf", sans-serif;
+  max-width: 800px; /* Adjust as needed */
+  margin: 20px auto;
+  padding: 20px;
+  color: var(--text);
+  background-color: var(--background);
+}
+
+.verifier-container h1,
+.verifier-container h2 {
+  color: var(--button-bg); /* Match heading color */
+  text-align: left;
+  margin-bottom: 15px;
+}
+
+.verifier-container h1 {
+  font-size: 2em; /* Adjust */
+}
+
+.verifier-container h2 {
+  font-size: 1.5em; /* Adjust */
+  margin-top: 30px; /* Space between sections */
+  border-bottom: 1px solid var(--card-border); /* Separator */
+  padding-bottom: 10px;
+}
+
+.verifier-intro-text,
+.verifier-section p {
+  color: var(--text);
+  line-height: 1.6;
+  margin-bottom: 10px;
+  text-align: left;
+}
+
+.verifier-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  flex-wrap: wrap; /* Allow wrapping on small screens */
+  gap: 10px;
+}
+
+.verifier-user-info {
+  font-size: 0.9em;
+  color: var(--text-muted, var(--text));
+  margin: 0; /* Remove default paragraph margin */
+}
+
+/* Buttons */
+.verifier-sign-out-button,
+.verifier-submit-button,
+.verifier-action-button,
+.verifier-revoke-button {
+  background: var(--button-bg);
+  color: var(--button-text);
+  border: none;
+  border-radius: 6px;
+  padding: 8px 15px; /* Slightly smaller padding */
+  font-weight: 700;
+  font-size: 0.9em;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.verifier-sign-out-button:hover,
+.verifier-submit-button:hover,
+.verifier-action-button:hover,
+.verifier-revoke-button:hover {
+  background: var(--button-hover-bg, #0056b3); /* Use main hover color */
+}
+
+.verifier-sign-out-button:disabled,
+.verifier-submit-button:disabled,
+.verifier-action-button:disabled,
+.verifier-revoke-button:disabled {
+  background-color: var(--button-disabled-bg, #cccccc); /* Add disabled style */
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Form Styles */
+.verifier-section {
+  background: var(--navbar-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.verifier-input-container {
+  position: relative; /* For autocomplete positioning */
+  max-width: 400px; /* Limit width */
+}
+
+.verifier-form-container {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap; /* Allow wrapping */
+}
+
+.verifier-input-field {
+  flex-grow: 1; /* Take available space */
+  border: 2px solid var(--card-border);
+  border-radius: 6px;
+  padding: 9px;
+  font-size: 1em;
+  background-color: var(--navbar-bg);
+  color: var(--text);
+  transition: all 0.3s ease;
+  font-family: inherit; /* Use main font */
+  min-width: 200px; /* Ensure minimum width */
+}
+
+.verifier-input-field:hover,
+.verifier-input-field:focus {
+  border-color: var(--button-bg);
+  background-color: var(--background); /* Match main app focus */
+  outline: none;
+}
+
+/* Autocomplete Styles */
+.verifier-suggestions-list {
+  position: absolute;
+  top: 100%; /* Position below input */
+  left: 0;
+  right: 0;
+  background-color: var(--navbar-bg);
+  border: 1px solid var(--card-border);
+  border-top: none; /* Avoid double border */
+  border-radius: 0 0 6px 6px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 10;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.verifier-suggestion-item {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--card-border);
+}
+.verifier-suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.verifier-suggestion-item:hover {
+  background-color: var(--background); /* Use main background for hover */
+}
+
+.verifier-suggestion-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  margin-right: 10px;
+  object-fit: cover;
+}
+
+.verifier-suggestion-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.verifier-suggestion-display-name {
+  font-weight: bold;
+  color: var(--text);
+}
+
+.verifier-suggestion-handle {
+  font-size: 0.9em;
+  color: var(--text-muted, var(--text));
+}
+
+/* Status Box */
+.verifier-status-box {
+  padding: 15px;
+  border-radius: 6px;
+  margin-top: 15px;
+  text-align: center;
+}
+.verifier-status-box-success {
+  background-color: var(--success-bg, #d4edda); /* Add theme variables */
+  color: var(--success-text, #155724);
+  border: 1px solid var(--success-border, #c3e6cb);
+}
+.verifier-status-box-error {
+  background-color: var(--error-bg, #f8d7da); /* Add theme variables */
+  color: var(--error-text, #721c24);
+  border: 1px solid var(--error-border, #f5c6cb);
+}
+.verifier-status-box .intent-link {
+  color: var(--success-text, #155724);
+  font-weight: bold;
+  text-decoration: underline;
+}
+
+/* Verification Lists */
+.verifier-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px; /* Space above list */
+}
+.verifier-list-header h2 {
+  margin: 0;
+  border: none; /* Remove border inherited from h2 general style */
+  padding: 0;
+}
+
+.verifier-list,
+.verifier-verifier-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.verifier-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start; /* Align items to top */
+  background-color: var(--navbar-bg); /* Match form background */
+  padding: 15px;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap; /* Allow actions to wrap */
+  gap: 10px;
+}
+.verifier-list-item-content {
+  flex-grow: 1;
+}
+.verifier-list-item-handle {
+  font-size: 0.9em;
+  color: var(--text-muted, var(--text));
+  margin: 2px 0;
+}
+.verifier-list-item-date {
+  font-size: 0.8em;
+  color: var(--text-muted, var(--text));
+  margin-top: 5px;
+}
+
+.verifier-list-item-actions {
+  flex-shrink: 0; /* Prevent button shrinking */
+}
+
+.verifier-list-item-invalid {
+  border-left: 5px solid var(--warning-border, orange); /* Highlight invalid items */
+}
+
+.verifier-validity-warning {
+  margin-top: 10px;
+  padding: 10px;
+  background-color: var(--warning-bg, #fff3cd);
+  border: 1px solid var(--warning-border, #ffeeba);
+  color: var(--warning-text, #856404);
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+.verifier-validity-warning p {
+  margin: 5px 0;
+  color: var(--warning-text, #856404); /* Ensure text color consistency */
+  text-align: left;
+}
+
+/* Network Verifications */
+.verifier-check-network-button {
+  font-size: 0.9em;
+}
+.verifier-network-status {
+  font-style: italic;
+  color: var(--text-muted, var(--text));
+  margin: 10px 0;
+}
+.verifier-network-results {
+  margin-top: 15px;
+}
+.verifier-network-results .verifier-verifier-list {
+  margin-bottom: 15px; /* Space between lists */
+}
+.verifier-additional-context {
+  font-size: 0.9em;
+  color: var(--text-muted, var(--text));
+  margin-top: 15px;
+  border-top: 1px dashed var(--card-border);
+  padding-top: 10px;
+}
+.verifier-share-stats-link {
+  display: inline-block;
+  margin-top: 15px;
+  font-size: 0.9em;
+  font-weight: bold;
+}
+
+
+/* Official Verifier Status */
+.verifier-official-verifier-tooltip {
+  cursor: help;
+  display: inline-block;
+  margin-left: 5px;
+  font-weight: bold;
+  border: 1px solid var(--text-muted, #ccc);
+  border-radius: 50%;
+  width: 1.2em;
+  height: 1.2em;
+  line-height: 1.2em;
+  text-align: center;
+  font-size: 0.8em; /* Smaller question mark */
+  color: var(--text-muted, var(--text));
+}
+
+.verifier-official-verifier-note {
+  font-size: 0.9em;
+  margin: 5px 0;
+  padding-left: 5px; /* Indent slightly */
+}
+
+.verifier-verified-status { color: var(--success-text, green); }
+.verifier-not-verified-status { color: var(--text-muted, grey); }
+.verifier-error-status { color: var(--error-text, red); }
+.verifier-checking-status, .verifier-idle-status { color: var(--text-muted, grey); } 

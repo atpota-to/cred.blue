@@ -131,7 +131,8 @@ const Navbar = () => {
     items: [
       { title: "library", path: "/resources" },
       { title: "alt text rating", path: "/alt-text" },
-      { title: "omnifeed", path: "/omnifeed" }
+      { title: "omnifeed", path: "/omnifeed" },
+      { title: "verifier", path: "/verifier" }
     ]
   };
 

@@ -642,9 +642,6 @@ function Verifier() {
 
   if (isAuthLoading) return <p>Loading authentication...</p>;
   if (authError) return <p>Authentication Error: {authError}. <a href="/login">Please login</a>.</p>;
-  if (!session && !isAuthLoading && !authError) {
-     return (<div className="verifier-container"><h1>Bluesky Verifier Tool</h1><p>Please <a href="/login">login with Bluesky</a> to use the verifier tool.</p></div>);
-  }
 
   const isAnyOperationInProgress = isVerifying || isRevoking || isLoadingVerifications || isLoadingNetwork || isCheckingValidity;
 

@@ -61,7 +61,6 @@
   transition: all 0.3s ease;
   font-family: inherit;
   text-align: center;
-  width: 100%;
   box-sizing: border-box;
   margin: 0;
 }
@@ -119,10 +118,12 @@
 }
 
 .login-privacy-note {
-  font-size: 0.85em;
-  color: var(--text-muted, #6c757d);
-  margin-top: 10px;
+  color: var(--text-muted,#6c757d);
+  font-size: .85em;
   text-align: center;
+  max-width: 250px;
+  margin: auto;
+  margin-top: 15px;
 }
 
 .login-status p {

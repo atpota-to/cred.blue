@@ -313,6 +313,10 @@
   margin-top: 5px;
 }
 
+.verifier-list {
+  margin-top: 15px;
+}
+
 .verifier-validity-status.valid {
   background-color: var(--success-bg, rgba(0, 128, 0, 0.1));
   color: var(--success-text, green);

@@ -128,7 +128,7 @@ function Verifier() {
       const agentInstance = new Agent(session);
       setAgent(agentInstance);
 
-      agentInstance.getProfile({ actor: session.did })
+      agentInstance.api.app.bsky.actor.getProfile({ actor: session.did })
         .then(res => {
           console.log('Logged-in user profile fetched successfully:', res.data);
           setUserInfo(res.data);
@@ -147,7 +147,7 @@ function Verifier() {
     if (!agent || !session) return;
     setIsLoadingVerifications(true);
     try {
-      const response = await agent.listRecords({
+      const response = await agent.api.com.atproto.repo.listRecords({
         repo: session.did,
         collection: 'app.bsky.graph.verification',
         limit: 100,
@@ -187,7 +187,7 @@ function Verifier() {
         const batch = updatedVerifications.slice(i, i + batchSize);
         await Promise.all(batch.map(async (verification, index) => {
           try {
-            const profileRes = await agent.getProfile({ actor: verification.handle });
+            const profileRes = await agent.api.app.bsky.actor.getProfile({ actor: verification.handle });
             const currentHandle = profileRes.data.handle;
             const currentDisplayName = profileRes.data.displayName || profileRes.data.handle;
             const batchIndex = i + index;
@@ -230,7 +230,7 @@ function Verifier() {
     try {
       const [follows, mutuals] = await Promise.all([
         fetchAllPaginated(publicAgent, publicAgent.api.app.bsky.graph.getFollows.bind(publicAgent.api.app.bsky.graph), { actor: session.did, limit: 100 }),
-        fetchAllPaginated(agent, agent.getKnownFollowers.bind(agent), { actor: session.did, limit: 100 })
+        fetchAllPaginated(agent, agent.api.app.bsky.graph.getKnownFollowers.bind(agent.api.app.bsky.graph), { actor: session.did, limit: 100 })
       ]);
 
       console.log(`Fetched ${follows.length} follows, ${mutuals.length} mutuals.`);
@@ -271,7 +271,7 @@ function Verifier() {
 
           do {
             try {
-              const response = await tempPublicAgent.listRecords({
+              const response = await tempPublicAgent.api.com.atproto.repo.listRecords({
                  repo: did,
                  collection: 'app.bsky.graph.verification',
                  limit: 100,
@@ -352,7 +352,7 @@ function Verifier() {
 
         do {
           try {
-            const response = await tempPublicAgent.listRecords({
+            const response = await tempPublicAgent.api.com.atproto.repo.listRecords({
                repo: verifierDid,
                collection: 'app.bsky.graph.verification',
                limit: 100,
@@ -438,7 +438,7 @@ function Verifier() {
     setStatusMessage(`Verifying ${targetHandle}...`);
     setShowSuggestions(false);
     try {
-      const profileRes = await agent.getProfile({ actor: targetHandle });
+      const profileRes = await agent.api.app.bsky.actor.getProfile({ actor: targetHandle });
       const targetDid = profileRes.data.did;
       const targetDisplayName = profileRes.data.displayName || profileRes.data.handle;
       const verificationRecord = {
@@ -448,7 +448,7 @@ function Verifier() {
         displayName: targetDisplayName,
         createdAt: new Date().toISOString(),
       };
-      await agent.createRecord({
+      await agent.api.com.atproto.repo.createRecord({
         repo: session.did,
         collection: 'app.bsky.graph.verification',
         record: verificationRecord,
@@ -477,7 +477,7 @@ function Verifier() {
     try {
       const parts = verification.uri.split('/');
       const rkey = parts[parts.length - 1];
-      await agent.deleteRecord({
+      await agent.api.com.atproto.repo.deleteRecord({
         repo: session.did,
         collection: 'app.bsky.graph.verification',
         rkey: rkey

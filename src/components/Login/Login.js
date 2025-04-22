@@ -38,8 +38,8 @@ const Login = () => {
   }
 
   return (
-    <div className="login-container">
-      <div className="login-card">
+    <div className="home-page">
+      <div className="home-content">
         <h1>Login to cred.blue</h1>
         <p>Enter your Bluesky or ATProto handle (e.g., yourname.bsky.social)</p>
         <form onSubmit={handleSubmit} className="login-form">

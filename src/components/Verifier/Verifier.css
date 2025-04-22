@@ -234,12 +234,6 @@
   color: var(--success-text-dark, #a3e9a4);
 }
 
-/* Verification Lists */
-.verifier-list-header {
-  display: flex; /* Add this to make flexbox work */
-  justify-content: space-between; /* Align button to the right */
-  align-items: center;
-}
 .verifier-list-header h2 {
   margin: 0;
   padding: 0;

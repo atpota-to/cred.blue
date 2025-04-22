@@ -261,7 +261,7 @@ const Navbar = () => {
                 type="button"
                 onClick={() => navigate('/login')}
               >
-                login with bluesky
+                login
               </button>
             </div>
           )}

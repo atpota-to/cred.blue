@@ -439,7 +439,6 @@ const filteredResources = useMemo(() => {
               />
             </div>
             
-            <div className="quick-actions">
               <button
                 className="feeling-lucky-button"
                 type="button"
@@ -448,7 +447,6 @@ const filteredResources = useMemo(() => {
               >
                 Feeling Lucky
               </button>
-            </div>
           </div>
         </header>
         

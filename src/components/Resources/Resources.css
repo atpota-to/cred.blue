@@ -616,13 +616,11 @@
 
 /* Update the search-filters-container class to match the new search class names */
 .search-filters-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 15px;
-  margin-top: 10px;
-  margin-bottom: 15px;
-  justify-content: space-between;
   align-items: center;
+  display: flex;
+  gap: 15px;
+  justify-content: space-between;
+  margin: auto;
 }
 
 /* Quick actions */
@@ -685,7 +683,6 @@
   justify-content: center;
   background-color: var(--card-border);
   color: var(--text);
-  padding: 0 20px; /* Adjusted padding */
   border: none;
   border-radius: 8px;
   font-size: 0.95rem;

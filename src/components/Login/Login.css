@@ -46,10 +46,9 @@
 }
 
 .login-form {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-  width: 100%;
+  background: none;
+  border: none;
+  padding: 0px;
 }
 
 .login-input-field {

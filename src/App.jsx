@@ -23,6 +23,7 @@ import Login from './components/Login/Login';
 import LoginCallback from './components/Login/LoginCallback';
 import Verifier from './components/Verifier/Verifier';
 import { AuthProvider } from './contexts/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
 import "./App.css";
 
 const App = () => {
@@ -51,7 +52,14 @@ const App = () => {
                 <Route path="/definitions" element={<Definitions />} />
                 <Route path="/leaderboard" element={<Leaderboard />} />
                 <Route path="/resources" element={<Resources />} />
-                <Route path="/verifier" element={<Verifier />} />
+                <Route 
+                  path="/verifier" 
+                  element={
+                    <ProtectedRoute>
+                      <Verifier />
+                    </ProtectedRoute>
+                  } 
+                />
                 <Route path="/shortcut" element={<Shortcut />} />
                 <Route path="/zen" element={<ZenPage />} />
                 <Route path="/methodology" element={<ScoringMethodology />} />

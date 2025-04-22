@@ -41,13 +41,13 @@ const Login = () => {
     <div className="home-page">
       <div className="home-content">
         <h1>Login to cred.blue</h1>
-        <p>Enter your Bluesky or ATProto handle (e.g., yourname.bsky.social)</p>
+        <p>Enter your Bluesky or ATProto handle</p>
         <form onSubmit={handleSubmit} className="login-form">
           <input
             type="text"
             value={handle}
             onChange={handleInputChange}
-            placeholder="yourname.bsky.social (optional)"
+            placeholder="username.bsky.social"
             aria-label="Bluesky Handle (optional)"
             className="login-input-field"
             disabled={loading}
@@ -59,7 +59,7 @@ const Login = () => {
             disabled={loading}
             className="login-submit-button"
           >
-            {loading ? 'Processing...' : 'Login'}
+            {loading ? 'Processing...' : 'Login with Bluesky'}
           </button>
         </form>
         <p className="login-privacy-note">

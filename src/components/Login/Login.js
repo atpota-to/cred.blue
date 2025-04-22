@@ -40,8 +40,8 @@ const Login = () => {
   return (
     <div className="login-container">
       <div className="login-card">
-        <h1>Login to Cred Blue</h1>
-        <p>Enter your Bluesky handle (e.g., yourname.bsky.social) or leave blank to use bsky.social.</p>
+        <h1>Login to cred.blue</h1>
+        <p>Enter your Bluesky or ATProto handle (e.g., yourname.bsky.social)</p>
         <form onSubmit={handleSubmit} className="login-form">
           <input
             type="text"
@@ -59,11 +59,11 @@ const Login = () => {
             disabled={loading}
             className="login-submit-button"
           >
-            {loading ? 'Processing...' : 'Login with Bluesky'}
+            {loading ? 'Processing...' : 'Login'}
           </button>
         </form>
         <p className="login-privacy-note">
-          We use official Bluesky authentication. We don't see or store your password.
+          We use official Bluesky/ATProto OAuth to securely process your login.
         </p>
       </div>
     </div>

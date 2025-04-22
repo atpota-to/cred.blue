@@ -38,6 +38,10 @@
   gap: 10px;
 }
 
+.verifier-list {
+  margin-top: 10px;
+}
+
 .verifier-user-info {
   font-size: 0.9em;
   color: var(--text-muted, var(--text));
@@ -232,9 +236,9 @@
 
 /* Verification Lists */
 .verifier-list-header {
+  display: flex; /* Add this to make flexbox work */
   justify-content: space-between; /* Align button to the right */
   align-items: center;
-  margin-bottom: 10px; /* Space above list */
 }
 .verifier-list-header h2 {
   margin: 0;
@@ -283,19 +287,84 @@
   border-left: 5px solid var(--warning-border, orange); /* Highlight invalid items */
 }
 
-.verifier-validity-warning {
-  margin-top: 10px;
-  padding: 10px;
-  background-color: var(--warning-bg, #fff3cd);
-  border: 1px solid var(--warning-border, #ffeeba);
-  color: var(--warning-text, #856404);
-  border-radius: 4px;
-  font-size: 0.9em;
+/* New styles for verification list profile links */
+.verifier-profile-link {
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  color: var(--text);
+  margin-bottom: 5px;
 }
-.verifier-validity-warning p {
-  margin: 5px 0;
-  color: var(--warning-text, #856404); /* Ensure text color consistency */
-  text-align: left;
+
+.verifier-profile-link:hover {
+  text-decoration: underline;
+}
+
+.verifier-display-name {
+  font-weight: bold;
+  font-size: 1.05em;
+  margin-right: 5px;
+}
+
+/* Validity status indicators */
+.verifier-validity-status {
+  display: inline-block;
+  font-size: 0.9em;
+  padding: 3px 6px;
+  border-radius: 4px;
+  margin-top: 5px;
+}
+
+.verifier-validity-status.valid {
+  background-color: var(--success-bg, rgba(0, 128, 0, 0.1));
+  color: var(--success-text, green);
+}
+
+.verifier-validity-status.invalid {
+  background-color: var(--error-bg, rgba(255, 0, 0, 0.1));
+  color: var(--error-text, red);
+}
+
+.verifier-validity-status.checking {
+  background-color: var(--warning-bg, rgba(255, 165, 0, 0.1));
+  color: var(--warning-text, orange);
+}
+
+/* Dark mode compatibility */
+.dark-mode .verifier-validity-status.valid {
+  background-color: var(--success-bg-dark, rgba(0, 128, 0, 0.3));
+  color: var(--success-text-dark, #a3e9a4);
+}
+
+.dark-mode .verifier-validity-status.invalid {
+  background-color: var(--error-bg-dark, rgba(255, 0, 0, 0.2));
+  color: var(--error-text-dark, #f5c6cb);
+}
+
+.dark-mode .verifier-validity-status.checking {
+  background-color: var(--warning-bg-dark, rgba(255, 165, 0, 0.2));
+  color: var(--warning-text-dark, #ffe4b5);
+}
+
+/* Remove the now-unused validity warning box styles */
+.verifier-validity-warning {
+  display: none;
+}
+
+/* Media query for mobile optimization */
+@media (max-width: 480px) {
+  .verifier-list-item {
+    flex-direction: column;
+  }
+  
+  .verifier-list-item-content {
+    width: 100%;
+    margin-bottom: 10px;
+  }
+  
+  .verifier-list-item-actions {
+    align-self: flex-end;
+  }
 }
 
 /* Network Verifications */

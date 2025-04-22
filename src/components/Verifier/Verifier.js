@@ -724,10 +724,10 @@ function Verifier() {
             let message = '...'; let icon = '⏳'; let statusClass = 'verifier-idle-status';
             switch (status) {
               case 'checking': message = `Checking ${verifierId}...`; icon = '⏳'; statusClass = 'verifier-checking-status'; break;
-              case 'verified': message = `Verified by ${verifierId}.`; icon = '✅'; statusClass = 'verifier-verified-status'; break;
-              case 'not_verified': message = `Not verified by ${verifierId}.`; icon = '❌'; statusClass = 'verifier-not-verified-status'; break;
-              case 'error': message = `Error checking ${verifierId}.`; icon = '⚠️'; statusClass = 'verifier-error-status'; break;
-              default: message = `Pending check for ${verifierId}.`;
+              case 'verified': message = `Verified by ${verifierId}`; icon = '✅'; statusClass = 'verifier-verified-status'; break;
+              case 'not_verified': message = `Not verified by ${verifierId}`; icon = '❌'; statusClass = 'verifier-not-verified-status'; break;
+              case 'error': message = `Error checking ${verifierId}`; icon = '⚠️'; statusClass = 'verifier-error-status'; break;
+              default: message = `Pending check for ${verifierId}`;
             }
             return (<p key={verifierId} className={`verifier-official-verifier-note ${statusClass}`}>{icon} {message}</p>);
           })}
@@ -785,18 +785,23 @@ Check yours: https://cred.blue/verify`;
             {verifications.map((verification) => (
               <li key={verification.uri} className={`verifier-list-item ${verification.validityChecked && !verification.isValid ? 'verifier-list-item-invalid' : ''}`}>
                 <div className="verifier-list-item-content">
-                  <div style={{ fontWeight: 'bold' }}>{verification.displayName}</div>
-                  <div className="verifier-list-item-handle">@{verification.handle}</div>
-                  <div className="verifier-list-item-date">Verified: {new Date(verification.createdAt).toLocaleString()}</div>
-                  {verification.validityChecked && !verification.isValid && (
-                    <div className="verifier-validity-warning">
-                      {verification.validityError ? (<p>⚠️ Couldn't check profile</p>) : (<><p><strong>⚠️ Profile changed</strong></p><p><span>Now: @{verification.currentHandle}</span><br /><span>Name: {verification.currentDisplayName}</span></p></>)}
-                    </div>
+                  <a href={`https://bsky.app/profile/${verification.handle}`} target="_blank" rel="noopener noreferrer" className="verifier-profile-link">
+                    <span className="verifier-display-name">{verification.displayName}</span>
+                    <span className="verifier-list-item-handle">@{verification.handle}</span>
+                  </a>
+                  {verification.validityChecked && (
+                    <span className={`verifier-validity-status ${verification.isValid ? 'valid' : 'invalid'}`}>
+                      {verification.isValid ? '✅ Valid' : '❌ Changed'}
+                    </span>
                   )}
+                  {!verification.validityChecked && isCheckingValidity && (
+                      <span className="verifier-validity-status checking">⏳ Checking...</span>
+                  )}
+                  <div className="verifier-list-item-date">Verified: {new Date(verification.createdAt).toLocaleString()}</div>
                 </div>
                 <div className="verifier-list-item-actions">
                   <button onClick={() => handleRevoke(verification)} disabled={isRevoking || isLoadingVerifications} className="verifier-revoke-button">
-                    {(isRevoking && statusMessage.includes(verification.handle)) ? 'Revoking...' : 'Revoke'}
+                    {(isRevoking && revokeStatusMessage.includes(verification.handle)) ? 'Revoking...' : 'Revoke'}
                   </button>
                 </div>
               </li>

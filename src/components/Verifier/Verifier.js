@@ -524,11 +524,11 @@ function Verifier() {
         collection: 'app.bsky.graph.verification',
         record: verificationRecord,
       });
-      const postText = `I just verified @${targetHandle} using Bluesky's new decentralized verification system. Try verifying someone yourself using @cred.blue's new verification tool: https://cred.blue/verify`;
+      const postText = `I just verified @${targetHandle} using Bluesky's new verification system. Try verifying someone yourself using @cred.blue's verifier tool: https://cred.blue/verifier`;
       const encodedText = encodeURIComponent(postText);
       const intentUrl = `https://bsky.app/intent/compose?text=${encodedText}`;
       const successMessageJSX = (
-        <>Successfully created verification for {targetHandle}! <a href={intentUrl} target="_blank" rel="noopener noreferrer" className="verifier-intent-link">Post on Bluesky?</a></>
+        <>Successfully created verification for {targetHandle}! <a href={intentUrl} target="_blank" rel="noopener noreferrer" className="verifier-intent-link">Post on Bluesky to let them know?</a></>
       );
       setStatusMessage(successMessageJSX);
       setTargetHandle('');
@@ -595,7 +595,7 @@ function Verifier() {
       <div className="verifier-intro-container">
       <h1>Bluesky Verifier Tool</h1>
       <p className="verifier-intro-text">
-        With Bluesky's new decentralized verification system, anyone can verify anyone else and any Bluesky client can choose which accounts to treat as "Trusted Verifiers".
+        With Bluesky's new verification system, anyone can verify anyone else and any Bluesky client can choose which accounts to treat as "Trusted Verifiers".
       </p>
       <p className="verifier-intro-text">
         Try verifying an account for yourself or check to see who has verified you! It's as simple as creating a verification record in your PDS that points to the account you want to verify. The record looks like this: 
@@ -676,12 +676,12 @@ function Verifier() {
             {(() => {
               const statsText = `My verification stats:
 
-${networkVerifications.mutualsVerifiedMe.length} mutuals verified me
-${networkVerifications.followsVerifiedMe.length} follows verified me
-${networkVerifications.mutualsVerifiedAnyone}/${networkVerifications.fetchedMutualsCount} mutuals verified others
-${networkVerifications.followsVerifiedAnyone}/${networkVerifications.fetchedFollowsCount} follows verified others
+${networkVerifications.mutualsVerifiedMe.length} mutuals verified me,
+${networkVerifications.followsVerifiedMe.length} follows verified me,
+${networkVerifications.mutualsVerifiedAnyone}/${networkVerifications.fetchedMutualsCount} mutuals verified others,
+${networkVerifications.followsVerifiedAnyone}/${networkVerifications.fetchedFollowsCount} follows verified others,
 
-Check yours: https://cred.blue/verify`;
+Check yours: https://cred.blue/verifier`;
               const encodedStatsText = encodeURIComponent(statsText);
               const statsIntentUrl = `https://bsky.app/intent/compose?text=${encodedStatsText}`;
               return (<a href={statsIntentUrl} target="_blank" rel="noopener noreferrer" className="verifier-share-stats-link">Share your stats!</a>);

@@ -23,7 +23,7 @@
 
 .verifier-container h2 {
   font-size: 1.5em; /* Adjust */
-  margin-top: 30px; /* Space between sections */
+  margin-top: 0px; /* Space between sections */
   border-bottom: 1px solid var(--card-border); /* Separator */
   padding-bottom: 10px;
 }
@@ -63,6 +63,7 @@
   padding: 8px 15px; /* Slightly smaller padding */
   font-weight: 700;
   font-size: 0.9em;
+  margin: 0px;
   cursor: pointer;
   transition: background-color 0.3s ease;
 }
@@ -106,6 +107,8 @@
   gap: 10px;
   align-items: center;
   flex-wrap: wrap; /* Allow wrapping */
+  padding: 0px;
+  border: 0px;
 }
 
 .verifier-input-field {
@@ -296,8 +299,14 @@
 
 /* Network Verifications */
 .verifier-check-network-button {
-  font-size: 0.9em;
+  font-size: .9em;
+  margin: 0px;
 }
+
+.verifier-action-button.verifier-refresh-button {
+  margin: 0px;
+}
+
 .verifier-network-status {
   font-style: italic;
   color: var(--text-muted, var(--text));

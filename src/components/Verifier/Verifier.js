@@ -287,23 +287,39 @@ function Verifier() {
     setNetworkStatusMessage("Fetching network lists (mutuals, follows)...");
 
     try {
-      console.log("checkNetworkVerifications: Fetching follows (public) and mutuals (authenticated)...");
+      console.log("checkNetworkVerifications: Fetching follows (public) and attempting direct getKnownFollowers...");
 
-      // *** Fetch follows using direct fetch ***
+      // Fetch follows using direct fetch
       const followsUrl = `https://public.api.bsky.app/xrpc/app.bsky.graph.getFollows`;
       const followsParams = { actor: session.did, limit: 100 };
+      const follows = await fetchAllPaginated(null, null, followsParams, true, followsUrl);
 
-      // *** Fetch known followers using authenticated agent ***
-      const knownFollowersMethod = agent.api.app.bsky.graph.getKnownFollowers.bind(agent.api.app.bsky.graph);
-      const knownFollowersParams = { actor: session.did, limit: 100 };
+      // *** Fetch Known Followers Directly (First Page Only for Test) ***
+      let mutuals = [];
+      try {
+        const knownFollowersResponse = await agent.api.app.bsky.graph.getKnownFollowers({
+            actor: session.did,
+            limit: 100 // Fetch first page
+        });
+        if (knownFollowersResponse?.data?.followers) {
+            mutuals = knownFollowersResponse.data.followers;
+            console.log(`Direct getKnownFollowers call successful, got ${mutuals.length} mutuals.`);
+        } else {
+             console.warn("Direct getKnownFollowers call returned unexpected structure:", knownFollowersResponse);
+        }
+      } catch (knownFollowersError) {
+          console.error("Direct getKnownFollowers call failed:", knownFollowersError);
+          // Set status message to indicate failure for this part
+          setNetworkStatusMessage("Failed to fetch mutuals/known followers.");
+          // Optionally, proceed without mutuals or stop the check
+          // For now, let's continue with just follows if mutuals failed
+      }
 
-      const [follows, mutuals] = await Promise.all([
-        fetchAllPaginated(null, null, followsParams, true, followsUrl),
-        fetchAllPaginated(agent, knownFollowersMethod, knownFollowersParams)
-      ]);
+      // Now mutuals contains only the first page, or is empty on error.
+      // The rest of the logic will proceed, but mutuals data might be incomplete or missing.
 
-      console.log(`checkNetworkVerifications: Fetched ${follows.length} follows, ${mutuals.length} mutuals.`);
-      setNetworkStatusMessage(`Processing ${follows.length} follows and ${mutuals.length} mutuals...`);
+      console.log(`checkNetworkVerifications: Fetched ${follows.length} follows, ${mutuals.length} known followers (first page).`);
+      setNetworkStatusMessage(`Processing ${follows.length} follows and ${mutuals.length} known followers...`);
       setNetworkVerifications(prev => ({ ...prev, fetchedMutualsCount: mutuals.length, fetchedFollowsCount: follows.length }));
 
       const followsSet = new Set(follows.map(f => f.did));

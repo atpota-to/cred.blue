@@ -140,16 +140,14 @@ function Verifier() {
   useEffect(() => {
     // If session exists, create an Agent instance
     if (session) {
-      // The session object from the main AuthContext might be structured differently.
-      // Assuming it has an `accessJwt` and `did` (or `sub`)
-      const agentInstance = new Agent({
-         service: 'https://bsky.social', // Or get from session if available
-         session: session // Pass the session object directly
-      });
+      // The session object from AuthContext IS the session manager
+      // Pass it directly to the Agent constructor.
+      const agentInstance = new Agent(session);
       setAgent(agentInstance);
 
       // Fetch logged-in user's profile info using the authenticated API
-      agentInstance.api.app.bsky.actor.getProfile({ actor: session.did /* Ensure correct DID property */ })
+      // Use the agent's built-in DID reference after initialization
+      agentInstance.getProfile({ actor: agentInstance.session.did })
         .then(res => {
           console.log('Logged-in user profile fetched successfully:', res.data);
           setUserInfo(res.data);

@@ -4,88 +4,60 @@ import { useAuth } from '../../contexts/AuthContext';
 import './LoginCallback.css'; // Optional: Add styles if needed
 
 const LoginCallback = () => {
-  const { client } = useAuth(); // Get the client instance from context
+  // Get loading and authentication status from AuthContext
+  const { loading, isAuthenticated, error: authError } = useAuth();
   const navigate = useNavigate();
-  const [status, setStatus] = useState('Processing login...');
-  const [error, setError] = useState(null);
+  const [localError, setLocalError] = useState(null);
 
   useEffect(() => {
-    const handleCallback = async () => {
-      // Client might not be initialized immediately on page load
-      if (!client) {
-        setStatus('Waiting for authentication client...');
-        // Optionally add a small delay and retry or rely on AuthContext re-render
-        const timeoutId = setTimeout(() => {
-           if (!client) { // Check again after delay
-              console.error('OAuth client not available after delay.');
-              setError('Authentication client failed to load. Please try logging in again.');
-              setStatus(''); // Clear status message
-           }
-           // If client became available, the effect will re-run anyway
-        }, 2000); // Wait 2 seconds
-        return () => clearTimeout(timeoutId);
-      }
+    // Don't do anything until the AuthProvider is done loading
+    if (loading) {
+      return;
+    }
 
-      try {
-        console.log('(LoginCallback) Client available, attempting to handle callback...');
-        // The client.init() in AuthContext likely already handled the callback.
-        // We might not need client.callback() here if init handles it.
-        // However, keeping client.callback() as a fallback or direct handler can be robust.
-        // Check if init() already processed it by seeing if session exists
-        // This check might be complex depending on AuthContext's exact init timing.
+    // Once loading is complete, check the authentication status
+    if (isAuthenticated) {
+      console.log('(LoginCallback) Authentication successful, redirecting...');
+      // TODO: Implement state parsing for returnUrl if needed
+      const returnUrl = '/'; // Default redirect
+      navigate(returnUrl);
+    } else {
+      // If not authenticated after loading, something went wrong
+      console.error('(LoginCallback) Authentication failed after loading.');
+      setLocalError(authError || 'Authentication failed. Please try logging in again.');
+    }
 
-        // Let's assume AuthContext's init() handles the primary callback logic.
-        // This component might just need to redirect based on the resulting session state.
+  }, [loading, isAuthenticated, navigate, authError]); // Depend on loading and auth state
 
-        // Check AuthContext state directly (may require exposing session explicitly)
-        // Or simply redirect - AuthContext should have set the session if successful
+  // Display loading message
+  if (loading) {
+    return (
+      <div className="login-callback-container">
+        <h2>Processing Login</h2>
+        <p className="status-message">Verifying authentication...</p>
+        {/* Optionally add a spinner here */}
+      </div>
+    );
+  }
 
-        setStatus('Login successful! Redirecting...');
+  // Display error message if authentication failed
+  if (localError) {
+    return (
+      <div className="login-callback-container">
+        <h2>Authentication Failed</h2>
+        <p className="error-message">{localError}</p>
+        <button onClick={() => navigate('/login')} className="home-button">Try Login Again</button>
+        <button onClick={() => navigate('/')} className="home-button" style={{marginLeft: '10px'}}>Go to Homepage</button>
+      </div>
+    );
+  }
 
-        // Attempt to retrieve the original intended URL from state if passed during login
-        // Note: client.init() doesn't directly return state here. We might need
-        // AuthContext to store the state temporarily or parse it from the URL hash/query.
-        // For simplicity, we'll redirect to home. Implement state parsing if needed.
-
-        // Retrieve returnUrl from state saved during login (requires state handling)
-        // const stateParam = new URLSearchParams(window.location.hash.substring(1)).get('state') || new URLSearchParams(window.location.search).get('state');
-        let returnUrl = '/';
-        // if (stateParam) {
-        //   try {
-        //      const decodedState = JSON.parse(atob(stateParam)); // Adjust decoding if needed
-        //      returnUrl = decodedState.returnUrl || '/';
-        //   } catch (e) {
-        //      console.error("Error parsing state parameter:", e);
-        //   }
-        // }
-
-        // Redirect after a short delay to show the success message
-        setTimeout(() => {
-          navigate(returnUrl);
-        }, 1500);
-
-      } catch (err) {
-        console.error('(LoginCallback) Error processing callback:', err);
-        setError(`Login failed: ${err.message || 'Unknown error'}`);
-        setStatus('');
-      }
-    };
-
-    handleCallback();
-
-  }, [client, navigate]); // Depend on client availability
-
+  // Render nothing while redirecting (or a minimal redirecting message)
+  // This state should be brief as the effect triggers redirection quickly
   return (
-    <div className="login-callback-container">
-      <h2>Authentication Callback</h2>
-      {status && <p className="status-message">{status}</p>}
-      {error && <p className="error-message">{error}</p>}
-      {!status && !error && <p>Verifying authentication...</p>}
-      {/* Add a button to retry or go home if stuck */}
-      {(error || (!client && !status && !error)) && (
-         <button onClick={() => navigate('/')} className="home-button">Go to Homepage</button>
-      )}
-    </div>
+      <div className="login-callback-container">
+        <h2>Redirecting...</h2>
+      </div>
   );
 };
 

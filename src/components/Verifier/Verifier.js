@@ -131,6 +131,7 @@ function Verifier() {
   const { session, loading: isAuthLoading, error: authError, logout: signOut } = useAuth();
   const [targetHandle, setTargetHandle] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
+  const [revokeStatusMessage, setRevokeStatusMessage] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [isRevoking, setIsRevoking] = useState(false);
   const [agent, setAgent] = useState(null);
@@ -574,6 +575,7 @@ function Verifier() {
     if (!targetHandle) return;
     setIsVerifying(true);
     setStatusMessage(`Verifying ${targetHandle}...`);
+    setRevokeStatusMessage('');
     setShowSuggestions(false);
     try {
       const profileRes = await agent.api.app.bsky.actor.getProfile({ actor: targetHandle });
@@ -611,7 +613,8 @@ function Verifier() {
   const handleRevoke = async (verification) => {
     if (!agent || !session) return;
     setIsRevoking(true);
-    setStatusMessage(`Revoking verification for ${verification.handle}...`);
+    setRevokeStatusMessage(`Revoking verification for ${verification.handle}...`);
+    setStatusMessage('');
     try {
       const parts = verification.uri.split('/');
       const rkey = parts[parts.length - 1];
@@ -620,11 +623,11 @@ function Verifier() {
         collection: 'app.bsky.graph.verification',
         rkey: rkey
       });
-      setStatusMessage(`Successfully revoked verification for ${verification.handle}`);
+      setRevokeStatusMessage(`Successfully revoked verification for ${verification.handle}`);
       fetchVerifications();
     } catch (error) {
       console.error('Revocation failed:', error);
-      setStatusMessage(`Revocation failed: ${error.message || 'Unknown error'}`);
+      setRevokeStatusMessage(`Revocation failed: ${error.message || 'Unknown error'}`);
     } finally {
       setIsRevoking(false);
     }
@@ -775,6 +778,13 @@ Check yours: https://cred.blue/verify`;
           <h2>Accounts You've Verified</h2>
           <button onClick={fetchVerifications} disabled={isAnyOperationInProgress} className="verifier-action-button verifier-refresh-button">Refresh List</button>
         </div>
+
+        {revokeStatusMessage && (
+          <div className={`verifier-status-box ${revokeStatusMessage.includes('failed') ? 'verifier-status-box-error' : 'verifier-status-box-success'}`}>
+             <p>{revokeStatusMessage}</p>
+          </div>
+        )}
+
         {isLoadingVerifications ? (<p>Loading...</p>) : verifications.length === 0 ? (<p>You haven't verified any accounts.</p>) : (
           <ul className="verifier-list">
             {verifications.map((verification) => (
@@ -791,7 +801,7 @@ Check yours: https://cred.blue/verify`;
                 </div>
                 <div className="verifier-list-item-actions">
                   <button onClick={() => handleRevoke(verification)} disabled={isRevoking || isLoadingVerifications} className="verifier-revoke-button">
-                    {isRevoking ? 'Revoking...' : 'Revoke'}
+                    {(isRevoking && statusMessage.includes(verification.handle)) ? 'Revoking...' : 'Revoke'}
                   </button>
                 </div>
               </li>

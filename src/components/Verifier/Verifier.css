@@ -187,21 +187,38 @@
   border-radius: 6px;
   margin-top: 15px;
   text-align: center;
+  border: 1px solid transparent; /* Base border */
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 .verifier-status-box-success {
-  background-color: var(--success-bg, #d4edda); /* Add theme variables */
+  background-color: var(--success-bg, #d4edda);
   color: var(--success-text, #155724);
-  border: 1px solid var(--success-border, #c3e6cb);
+  border-color: var(--success-border, #c3e6cb);
 }
 .verifier-status-box-error {
-  background-color: var(--error-bg, #f8d7da); /* Add theme variables */
+  background-color: var(--error-bg, #f8d7da);
   color: var(--error-text, #721c24);
-  border: 1px solid var(--error-border, #f5c6cb);
+  border-color: var(--error-border, #f5c6cb);
 }
-.verifier-status-box .intent-link {
+.verifier-status-box .verifier-intent-link { /* Renamed class */
   color: var(--success-text, #155724);
   font-weight: bold;
   text-decoration: underline;
+}
+
+/* Dark Mode Status Box Styles */
+.dark-mode .verifier-status-box-success {
+  background-color: var(--success-bg-dark, #1a3a24); /* Example dark variable */
+  color: var(--success-text-dark, #a3e9a4);
+  border-color: var(--success-border-dark, #2a5a34);
+}
+.dark-mode .verifier-status-box-error {
+  background-color: var(--error-bg-dark, #4d1f24); /* Example dark variable */
+  color: var(--error-text-dark, #f5c6cb);
+  border-color: var(--error-border-dark, #721c24);
+}
+.dark-mode .verifier-status-box .verifier-intent-link {
+  color: var(--success-text-dark, #a3e9a4);
 }
 
 /* Verification Lists */

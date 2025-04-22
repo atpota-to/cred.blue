@@ -42,9 +42,11 @@ export const AuthProvider = ({ children }) => {
       console.log('(AuthProvider) Initializing BrowserOAuthClient...');
 
       try {
-        // Create the client instance
-        const oauthClient = new BrowserOAuthClient({
-          clientMetadata: clientMetadata,
+        // Create the client instance using the .load() factory method
+        console.log(`(AuthProvider) Loading client metadata from: ${metadataUrl}`);
+        const oauthClient = await BrowserOAuthClient.load({
+          clientId: metadataUrl,
+          handleResolver: 'https://bsky.social',
           plcDirectoryUrl: 'https://plc.directory',
         });
 

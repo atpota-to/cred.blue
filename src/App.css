@@ -232,6 +232,12 @@ ol {
   text-align: center;
 }
 
+@media (max-width: 330px) {
+  input {
+    margin: 0;
+  }
+}
+
 .disclaimer {
   opacity: 0.6;
   font-size: 0.8em;

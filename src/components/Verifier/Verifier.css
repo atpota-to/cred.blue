@@ -253,8 +253,7 @@
 
 .verifier-list-item {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start; /* Align items to top */
+  align-items: center;
   background-color: var(--navbar-bg); /* Match form background */
   padding: 15px;
   border: 1px solid var(--card-border);
@@ -279,6 +278,7 @@
 
 .verifier-list-item-actions {
   flex-shrink: 0; /* Prevent button shrinking */
+  margin-left: auto; /* Added to push button right */
 }
 
 .verifier-list-item-invalid {

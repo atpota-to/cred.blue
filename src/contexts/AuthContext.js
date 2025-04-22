@@ -96,7 +96,7 @@ export const AuthProvider = ({ children }) => {
       // The state can be used to pass information through the redirect, like the return URL
       const stateData = JSON.stringify({ returnUrl });
       // signIn redirects the browser, so code execution stops here if successful
-      await client.signIn(handle || 'https://bsky.social', { // Use handle or default PDS
+      await client.signIn(handle, { // Pass handle directly for resolution
          state: stateData,
          // prompt: 'none', // Uncomment for silent sign-in attempt
       });

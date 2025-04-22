@@ -179,6 +179,8 @@ function Verifier() {
 
   const checkVerificationsValidity = useCallback(async (verificationsList) => {
     if (!agent || verificationsList.length === 0) return;
+    if (verificationsList.length === 0) return;
+
     setIsCheckingValidity(true);
     const updatedVerifications = [...verificationsList];
     try {
@@ -186,37 +188,56 @@ function Verifier() {
       for (let i = 0; i < updatedVerifications.length; i += batchSize) {
         const batch = updatedVerifications.slice(i, i + batchSize);
         await Promise.all(batch.map(async (verification, index) => {
+          const batchIndex = i + index;
           try {
-            const profileRes = await agent.api.app.bsky.actor.getProfile({ actor: verification.handle });
-            const currentHandle = profileRes.data.handle;
-            const currentDisplayName = profileRes.data.displayName || profileRes.data.handle;
-            const batchIndex = i + index;
+            // *** Get the specific PDS for the verified user ***
+            const targetDid = verification.subject;
+            const pdsEndpoint = await getPdsEndpoint(targetDid);
+
+            if (!pdsEndpoint) {
+              throw new Error(`Could not find PDS for ${verification.handle || targetDid}`);
+            }
+
+            // *** Use direct fetch to get the profile from the correct PDS ***
+            const profileUrl = `${pdsEndpoint}/xrpc/app.bsky.actor.getProfile?actor=${encodeURIComponent(targetDid)}`;
+            const profileResponse = await fetch(profileUrl);
+
+            if (!profileResponse.ok) {
+                // If profile fetch fails (e.g., 404), mark validity check failed
+                throw new Error(`Failed to fetch profile from ${pdsEndpoint}: ${profileResponse.status}`);
+            }
+            const profileData = await profileResponse.json();
+
+            // Check if handle and displayName still match
+            const currentHandle = profileData.handle;
+            const currentDisplayName = profileData.displayName || profileData.handle;
+
             updatedVerifications[batchIndex].validityChecked = true;
             updatedVerifications[batchIndex].isValid =
               currentHandle === verification.handle &&
               currentDisplayName === verification.displayName;
+
             if (!updatedVerifications[batchIndex].isValid) {
               updatedVerifications[batchIndex].currentHandle = currentHandle;
               updatedVerifications[batchIndex].currentDisplayName = currentDisplayName;
             }
-            setVerifications([...updatedVerifications]);
           } catch (err) {
-            console.error(`Failed to check validity for ${verification.handle}:`, err);
-            const batchIndex = i + index;
+            console.error(`Failed to check validity for ${verification.handle || verification.subject}:`, err);
             updatedVerifications[batchIndex].validityChecked = true;
             updatedVerifications[batchIndex].isValid = false;
             updatedVerifications[batchIndex].validityError = true;
-            setVerifications([...updatedVerifications]);
           }
         }));
+        // Update state after each batch completes
+        setVerifications([...updatedVerifications]);
       }
       console.log('Verified all records validity:', updatedVerifications);
     } catch (error) {
-      console.error('Failed to check verifications validity:', error);
+      console.error('Error during batch processing for validity check:', error);
     } finally {
       setIsCheckingValidity(false);
     }
-  }, [agent]);
+  }, []); // Removed agent dependency as it's no longer used directly here
 
   const checkNetworkVerifications = useCallback(async () => {
     if (!agent || !session || !userInfo) return;

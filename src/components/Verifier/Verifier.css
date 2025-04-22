@@ -369,8 +369,8 @@
   padding-left: 5px; /* Indent slightly */
 }
 
-.verifier-list-header {
-  margin-bottom: 20px;
+.verifier-network-results {
+  margin-top: 20px;
 }
 
 .verifier-verified-status { color: var(--success-text, green); }

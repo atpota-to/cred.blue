@@ -609,7 +609,7 @@ function Verifier() {
 
       <div className="verifier-section">
         <h2>Verify a Bluesky User</h2>
-        <p>Enter the handle of the user you want to verify (e.g., targetuser.bsky.social):</p>
+        <p>Enter the handle of the user you want to verify:</p>
           <form onSubmit={handleVerify} className="verifier-form-container" style={{ marginBottom: 0 }}>
             <input
               type="text"

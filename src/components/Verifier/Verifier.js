@@ -403,6 +403,7 @@ function Verifier() {
     } finally {
       setIsLoadingNetwork(false);
       setNetworkChecked(true);
+      setNetworkStatusMessage('');
     }
   }, [agent, session, userInfo]);
 

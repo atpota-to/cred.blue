@@ -79,14 +79,10 @@ form {
   background: var(--navbar-bg);
   border: 5px solid var(--card-border);
   border-radius: 12px;
-  box-shadow: none;
-  gap: 15px;
-  justify-content: center;
-  margin: 10px auto;
-  padding: 20px 30px;
+  transition: background-color .3s ease,border-color .3s ease;
   display: flex;
   flex-direction: column;
-  transition: background-color 0.3s ease, border-color 0.3s ease;
+  gap: 10.5px;
 }
 
 input {
@@ -103,13 +99,6 @@ input {
   color: var(--text);
   transition: all 0.3s ease;
   font-family: articulat-cf;
-}
-
-@media (max-width: 450px) {
-  input {
-    max-width: 85%;
-    margin: auto;
-  }
 }
 
 input:hover {

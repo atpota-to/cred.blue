@@ -170,8 +170,9 @@ function Verifier() {
 
     setIsLoadingVerifications(true);
     try {
-      const response = await agent.api.com.atproto.repo.listRecords({
-        repo: session.did, // Use session.did
+      // Use direct agent method
+      const response = await agent.listRecords({
+        repo: session.did,
         collection: 'app.bsky.graph.verification',
         limit: 100,
       });
@@ -220,8 +221,8 @@ function Verifier() {
 
         await Promise.all(batch.map(async (verification, index) => {
           try {
-            // Get current profile data
-            const profileRes = await agent.api.app.bsky.actor.getProfile({
+            // Use direct agent method
+            const profileRes = await agent.getProfile({
               actor: verification.handle
             });
 
@@ -283,9 +284,10 @@ function Verifier() {
     try {
       // Fetch follows (public) and known followers/mutuals (authenticated)
       const [follows, mutuals] = await Promise.all([
-        fetchAllPaginated(publicAgent, publicAgent.api.app.bsky.graph.getFollows.bind(publicAgent.api.app.bsky.graph), { actor: session.did, limit: 100 }), // Use session.did
-        // Use the main authenticated agent for getKnownFollowers
-        fetchAllPaginated(agent, agent.api.app.bsky.graph.getKnownFollowers.bind(agent.api.app.bsky.graph), { actor: session.did, limit: 100 }) // Use session.did
+        // Use direct agent method (even for public agent)
+        fetchAllPaginated(publicAgent, publicAgent.getFollows.bind(publicAgent), { actor: session.did, limit: 100 }),
+        // Use direct agent method
+        fetchAllPaginated(agent, agent.getKnownFollowers.bind(agent), { actor: session.did, limit: 100 })
       ]);
 
       console.log(`Fetched ${follows.length} follows (public), ${mutuals.length} mutuals (authenticated).`); // Updated log
@@ -432,7 +434,7 @@ function Verifier() {
         } else {
           verifierDid = verifierIdentifier;
           try {
-             const profileRes = await publicAgent.api.app.bsky.actor.getProfile({ actor: verifierDid });
+             const profileRes = await publicAgent.getProfile({ actor: verifierDid });
              verifierHandle = profileRes.data.handle;
           } catch (profileError) { /* ignore */ }
         }
@@ -581,7 +583,7 @@ function Verifier() {
       // 1. Get profile of targetHandle (resolve handle to DID and get display name)
       setStatusMessage(`Fetching profile for ${targetHandle}...`);
       // Use the proper API namespace method
-      const profileRes = await agent.api.app.bsky.actor.getProfile({ actor: targetHandle });
+      const profileRes = await agent.getProfile({ actor: targetHandle });
       const targetDid = profileRes.data.did;
       const targetDisplayName = profileRes.data.displayName || profileRes.data.handle;
       console.log('Target Profile:', profileRes.data);
@@ -600,7 +602,7 @@ function Verifier() {
       setStatusMessage(`Creating verification record for ${targetHandle} on your profile...`);
 
       // The correct method is repo.createRecord, not createRecord
-      const createRes = await agent.api.com.atproto.repo.createRecord({
+      const createRes = await agent.createRecord({
         repo: session.did, // Use session.did
         collection: 'app.bsky.graph.verification', // The NSID of the record type
         record: verificationRecord,
@@ -655,7 +657,7 @@ function Verifier() {
       const parts = verification.uri.split('/');
       const rkey = parts[parts.length - 1];
 
-      await agent.api.com.atproto.repo.deleteRecord({
+      await agent.deleteRecord({
         repo: session.did, // Use session.did
         collection: 'app.bsky.graph.verification',
         rkey: rkey

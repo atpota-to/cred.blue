@@ -93,8 +93,12 @@
 }
 
 .verifier-input-container {
-  position: relative; /* For autocomplete positioning */
-  max-width: 400px; /* Limit width */
+  position: relative; /* Needed for autocomplete positioning */
+  max-width: 400px;
+  border: none; /* Remove any potential border */
+  outline: none; /* Remove outline on focus */
+  padding: 0; /* Remove padding if any was added */
+  margin: 0; /* Remove margin if any was added */
 }
 
 .verifier-form-container {
@@ -224,7 +228,7 @@
 /* Verification Lists */
 .verifier-list-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: space-between; /* Align button to the right */
   align-items: center;
   margin-bottom: 10px; /* Space above list */
 }

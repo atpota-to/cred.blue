@@ -589,48 +589,40 @@
   font-weight: 500;
 }
 
-/* Search and quick actions container */
-.search-filters-container {
-  display: flex;
-  gap: 1rem;
-  justify-content: center;
-  align-items: center; /* Changed from stretch to center */
-  height: 48px; /* Set a fixed height for the container */
-}
-
-/* Improved search input */
-.search-container {
-  position: relative;
-  height: 100%; /* Make it fill the container height */
-}
-
-.search-icon {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 1rem;
-  opacity: 0.6;
-  z-index: 1;
-}
-
-.search-input {
+/* Renamed search classes to avoid collision with SearchBar component */
+.resources-search-container {
+  flex-grow: 1;
   width: 100%;
-  padding: 0 12px 0 40px; /* Adjusted padding */
-  font-size: 1rem;
+  position: relative;
+}
+
+.resources-search-input {
+  width: 100%;
+  padding: 9px 15px;
   border: 2px solid var(--card-border);
-  border-radius: 8px;
+  border-radius: 6px;
+  font-size: 1rem;
   background-color: var(--navbar-bg);
   color: var(--text);
   transition: all 0.3s ease;
-  height: 100%; /* Make it fill the container height */
-  box-sizing: border-box; /* Include padding and border in the element's total height */
 }
 
-.search-input:focus {
+.resources-search-input:hover,
+.resources-search-input:focus {
   border-color: var(--button-bg);
+  background-color: var(--background);
   outline: none;
-  box-shadow: 0 0 0 3px rgba(var(--button-bg-rgb), 0.2);
+}
+
+/* Update the search-filters-container class to match the new search class names */
+.search-filters-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-top: 10px;
+  margin-bottom: 15px;
+  justify-content: space-between;
+  align-items: center;
 }
 
 /* Quick actions */

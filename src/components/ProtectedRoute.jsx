@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -6,40 +6,58 @@ const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading, session } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const [shouldRender, setShouldRender] = useState(false);
+  const [redirectTriggered, setRedirectTriggered] = useState(false);
 
-  // Detailed status logging
+  // Log initial state on mount
   useEffect(() => {
-    console.log('ProtectedRoute status:', { 
+    console.log('ProtectedRoute mounted with auth state:', { 
       isAuthenticated, 
-      loading, 
+      loading,
       hasDid: session?.did ? true : false,
       path: location.pathname
     });
-  }, [isAuthenticated, loading, session, location]);
-
-  // Force navigation when not authenticated and not loading
+  }, []);
+  
+  // Determine if we should redirect or render children
   useEffect(() => {
-    if (!loading && !isAuthenticated) {
-      console.log('ProtectedRoute: Not authenticated, redirecting via useEffect hook');
-      const redirectUrl = `/login?returnUrl=${encodeURIComponent(location.pathname + location.search)}`;
-      navigate(redirectUrl, { replace: true });
+    // Only make decision after loading completes
+    if (!loading) {
+      if (isAuthenticated) {
+        console.log('ProtectedRoute: Authentication confirmed, will render protected content');
+        setShouldRender(true);
+      } else {
+        // Only trigger redirect once to avoid infinite loops
+        if (!redirectTriggered) {
+          console.log('ProtectedRoute: Not authenticated, redirecting to login');
+          setRedirectTriggered(true);
+          
+          // Prepare the redirect URL
+          const redirectUrl = `/login?returnUrl=${encodeURIComponent(location.pathname + location.search)}`;
+          
+          // Try React Router navigation first
+          navigate(redirectUrl, { replace: true });
+          
+          // Fallback to direct redirection after a short delay
+          // This ensures redirection happens even if React Router navigation fails
+          setTimeout(() => {
+            if (window.location.pathname !== '/login') {
+              console.log('ProtectedRoute: Fallback to direct window location redirect');
+              window.location.href = redirectUrl;
+            }
+          }, 100);
+        }
+      }
     }
-  }, [isAuthenticated, loading, navigate, location]);
+  }, [isAuthenticated, loading, navigate, location, redirectTriggered]);
 
-  // Only show loading state when actively checking auth
+  // Show loading state while checking auth
   if (loading) {
-    console.log('ProtectedRoute: Auth is still loading');
-    return <div>Checking authentication status...</div>;
+    return <div className="auth-loading">Checking authentication status...</div>;
   }
 
-  // If not authenticated, redirect with Navigate component as backup
-  if (!isAuthenticated) {
-    console.log('ProtectedRoute: Not authenticated, redirecting with Navigate component');
-    return <Navigate to={`/login?returnUrl=${encodeURIComponent(location.pathname + location.search)}`} replace />;
-  }
-
-  console.log('ProtectedRoute: Authentication confirmed, rendering protected content');
-  return children;
+  // Render children only when explicitly set to do so
+  return shouldRender ? children : <div className="auth-redirecting">Redirecting to login...</div>;
 };
 
 export default ProtectedRoute; 

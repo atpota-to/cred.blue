@@ -128,7 +128,7 @@ function useDebounce(value, delay) {
 // Renamed component to Verifier
 function Verifier() {
   // Use the main app's AuthContext
-  const { session, loading: isAuthLoading, error: authError, logout: signOut } = useAuth();
+  const { session, loading: isAuthLoading, error: authError, logout: signOut, isAuthenticated } = useAuth();
   const [targetHandle, setTargetHandle] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
   const [revokeStatusMessage, setRevokeStatusMessage] = useState('');
@@ -642,6 +642,13 @@ function Verifier() {
 
   if (isAuthLoading) return <p>Loading authentication...</p>;
   if (authError) return <p>Authentication Error: {authError}. <a href="/login">Please login</a>.</p>;
+  
+  // Check authentication after all hooks are defined
+  if (!session) {
+    console.log('Verifier: Not authenticated, waiting for ProtectedRoute redirection');
+    // Show a brief loading message while ProtectedRoute handles redirection
+    return <p>Checking authentication status...</p>;
+  }
 
   const isAnyOperationInProgress = isVerifying || isRevoking || isLoadingVerifications || isLoadingNetwork || isCheckingValidity;
 

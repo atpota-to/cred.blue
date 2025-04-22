@@ -428,13 +428,13 @@ const filteredResources = useMemo(() => {
           </div>
           
           <div className="search-filters-container">
-            <div className="search-container">
+            <div className="resources-search-container">
               <input 
                 type="text" 
                 placeholder="Search resources..." 
                 value={searchQuery}
                 onChange={handleSearchChange}
-                className="search-input"
+                className="resources-search-input"
                 aria-label="Search resources"
               />
             </div>

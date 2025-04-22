@@ -92,6 +92,11 @@
   color: #3B9AF8; /* Change color on hover */
 }
 
+/* Add rule for dark mode nav links */
+.dark-mode .navbar-links ul li a {
+  color: #3b9af8;
+}
+
 /* Right Section: Actions */
 .navbar-actions {
   display: flex;
@@ -329,9 +334,15 @@
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
+/* Add rule for base color of dropdown links in dark mode */
+.dark-mode .dropdown-menu li a {
+  color: #e0e0e0; /* Light grey for readability */
+}
+
 .dark-mode .dropdown-menu li a:hover {
   background-color: rgba(59, 154, 248, 0.2);
-  color: #66b2ff;
+  /* Update hover color to match main links */
+  color: #3b9af8;
 }
 
 /* ---------------------------------- */

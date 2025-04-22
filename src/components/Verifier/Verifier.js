@@ -569,26 +569,6 @@ function Verifier() {
   if (isAuthLoading) return <p>Loading authentication...</p>;
   if (authError) return <p>Authentication Error: {authError}. <a href="/login">Please login</a>.</p>;
   
-  // Direct redirect for unauthenticated users as a backup
-  if (!isAuthenticated) {
-    console.log('Verifier: Detected unauthenticated user, forcing redirect');
-    
-    // Force redirect as an additional failsafe
-    setTimeout(() => {
-      const redirectUrl = `/login?returnUrl=${encodeURIComponent(window.location.pathname)}`;
-      window.location.replace(redirectUrl);
-    }, 100);
-    
-    return <p>Authentication required. Redirecting to login...</p>;
-  }
-
-  // Verify we have a valid session
-  if (!session || !session.did) {
-    console.log('Verifier: Session invalid, forcing redirect');
-    window.location.replace('/login');
-    return <p>Session invalid. Redirecting to login...</p>;
-  }
-
   const isAnyOperationInProgress = isVerifying || isRevoking || isLoadingVerifications || isLoadingNetwork || isCheckingValidity;
 
   return (

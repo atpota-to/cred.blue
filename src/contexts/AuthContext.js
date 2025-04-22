@@ -143,10 +143,13 @@ export const AuthProvider = ({ children }) => {
     
     // Force a page refresh if session state changes and we're on a protected path
     // This ensures the latest auth state is always used for route protection
+    // REMOVED: This can cause unwanted flashing/reloads
+    /*
     if (!loading && window.location.pathname === '/verifier' && !session) {
       console.log('(AuthProvider) No session on protected page, forcing refresh');
       window.location.reload();
     }
+    */
   }, [session, loading, error]);
 
   return (

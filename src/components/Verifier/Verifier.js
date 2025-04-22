@@ -16,25 +16,44 @@ async function fetchAllPaginated(agentInstance, apiMethod, initialParams) {
   let results = [];
   let cursor = initialParams.cursor;
   const params = { ...initialParams };
-  let operationName = apiMethod.name.replace('bound ', '');
+  // Attempt to log the intended operation more reliably
+  const operationName = apiMethod.name.includes('bound ') ? apiMethod.name.split('bound ')[1].trim() : apiMethod.name;
+  console.log(`fetchAllPaginated: Starting ${operationName} with params:`, initialParams);
 
   do {
     try {
       if (cursor) {
         params.cursor = cursor;
       }
+      // Call the method. Assumes namespaced methods return { data: { records: [], cursor: '...' } }
+      // or similar structure where records are in an array under `data`.
       const response = await apiMethod(params);
-      const listKey = Object.keys(response.data || response).find(key => Array.isArray((response.data || response)[key]));
-      if (listKey && (response.data || response)[listKey]) {
-          results = results.concat((response.data || response)[listKey]);
+
+      // Check if response and response.data exist
+      if (!response || !response.data) {
+        console.warn(`fetchAllPaginated: Invalid response structure for ${operationName}`, response);
+        break; // Stop pagination if structure is unexpected
       }
-      cursor = (response.data || response).cursor;
+
+      // Find the key containing the array of results (e.g., 'records', 'follows', 'followers', 'actors')
+      const listKey = Object.keys(response.data).find(key => Array.isArray(response.data[key]));
+
+      if (listKey && response.data[listKey]) {
+        results = results.concat(response.data[listKey]);
+      } else {
+          console.warn(`fetchAllPaginated: Could not find results array key in response.data for ${operationName}`, response.data);
+      }
+
+      cursor = response.data.cursor;
+      // console.log(`fetchAllPaginated: Fetched page for ${operationName}, got ${response.data[listKey]?.length || 0} items, cursor: ${cursor}`);
+
     } catch (error) {
       console.error(`Error during paginated fetch for ${operationName}:`, error);
-      cursor = undefined;
+      cursor = undefined; // Stop pagination on error
     }
   } while (cursor);
 
+  console.log(`fetchAllPaginated: Finished ${operationName}, total items: ${results.length}`);
   return results;
 }
 
@@ -240,7 +259,10 @@ function Verifier() {
   }, []); // Removed agent dependency as it's no longer used directly here
 
   const checkNetworkVerifications = useCallback(async () => {
-    if (!agent || !session || !userInfo) return;
+    if (!agent || !session || !userInfo) {
+      console.warn("checkNetworkVerifications: Agent, session, or userInfo not available.");
+      return;
+    }
     setIsLoadingNetwork(true);
     setNetworkChecked(false);
     setNetworkVerifications({ mutualsVerifiedMe: [], followsVerifiedMe: [], mutualsVerifiedAnyone: 0, followsVerifiedAnyone: 0, fetchedMutualsCount: 0, fetchedFollowsCount: 0 });
@@ -249,19 +271,21 @@ function Verifier() {
     const publicAgent = new Agent({ service: 'https://public.api.bsky.app' });
 
     try {
+      console.log("checkNetworkVerifications: Fetching follows and mutuals...");
+      // Ensure correct agent and bound namespaced methods are used
       const [follows, mutuals] = await Promise.all([
         fetchAllPaginated(publicAgent, publicAgent.api.app.bsky.graph.getFollows.bind(publicAgent.api.app.bsky.graph), { actor: session.did, limit: 100 }),
         fetchAllPaginated(agent, agent.api.app.bsky.graph.getKnownFollowers.bind(agent.api.app.bsky.graph), { actor: session.did, limit: 100 })
       ]);
 
-      console.log(`Fetched ${follows.length} follows, ${mutuals.length} mutuals.`);
-      setNetworkStatusMessage(`Fetched ${follows.length} follows, ${mutuals.length} mutuals. Checking verifications...`);
+      console.log(`checkNetworkVerifications: Fetched ${follows.length} follows, ${mutuals.length} mutuals.`);
+      setNetworkStatusMessage(`Processing ${follows.length} follows and ${mutuals.length} mutuals...`);
       setNetworkVerifications(prev => ({ ...prev, fetchedMutualsCount: mutuals.length, fetchedFollowsCount: follows.length }));
 
       const followsSet = new Set(follows.map(f => f.did));
       const mutualsSet = new Set(mutuals.map(m => m.did));
       const allProfilesMap = new Map();
-      [...follows, ...mutuals].forEach(user => { if (!allProfilesMap.has(user.did)) allProfilesMap.set(user.did, user); });
+      [...follows, ...mutuals].forEach(user => { if (user && user.did && !allProfilesMap.has(user.did)) allProfilesMap.set(user.did, user); });
       const uniqueUserDids = Array.from(allProfilesMap.keys());
 
       if (uniqueUserDids.length === 0) {
@@ -271,63 +295,90 @@ function Verifier() {
         return;
       }
 
+      console.log(`checkNetworkVerifications: Checking ${uniqueUserDids.length} unique users...`);
       let results = { mutualsVerifiedMe: [], followsVerifiedMe: [], mutualsVerifiedAnyone: 0, followsVerifiedAnyone: 0 };
       const batchSize = 10;
+
       for (let i = 0; i < uniqueUserDids.length; i += batchSize) {
         const batchDids = uniqueUserDids.slice(i, i + batchSize);
-        setNetworkStatusMessage(`Checking network... (${i + batchDids.length}/${uniqueUserDids.length})`);
+        setNetworkStatusMessage(`Checking verification records... (${i + batchDids.length}/${uniqueUserDids.length})`);
 
-        await Promise.all(batchDids.map(async (did) => {
+        const batchPromises = batchDids.map(async (did) => {
           const profile = allProfilesMap.get(did);
-          if (!profile) return;
+          if (!profile) return null;
           const isMutual = mutualsSet.has(did);
           const isFollow = followsSet.has(did);
+
           const pdsEndpoint = await getPdsEndpoint(did);
           if (!pdsEndpoint) {
-             console.warn(`Skipping verification check for ${profile?.handle || did} (no PDS found).`);
-             return;
+            console.warn(`Skipping verification check for ${profile.handle || did} (no PDS found).`);
+            return null;
           }
 
+          // Create a temporary agent specifically for this user's PDS
+          const tempUserAgent = new Agent({ service: pdsEndpoint });
           let foundVerificationForMe = null;
           let hasVerifiedAnyone = false;
-          let listRecordsCursor = undefined;
-          const tempPublicAgent = new Agent({ service: pdsEndpoint });
 
-          do {
-            try {
-              const response = await tempPublicAgent.api.com.atproto.repo.listRecords({
-                 repo: did,
-                 collection: 'app.bsky.graph.verification',
-                 limit: 100,
-                 cursor: listRecordsCursor
-              });
-              const records = response.data.records || [];
-              if (records.length > 0) {
-                hasVerifiedAnyone = true;
-                const matchingRecord = records.find(record => record.value?.subject === session.did);
-                if (matchingRecord) { foundVerificationForMe = matchingRecord; break; }
+          try {
+            // Use fetchAllPaginated to handle listing records from the specific PDS
+            const verificationRecords = await fetchAllPaginated(
+              tempUserAgent, 
+              tempUserAgent.api.com.atproto.repo.listRecords.bind(tempUserAgent.api.com.atproto.repo), // Bind namespaced method
+              { repo: did, collection: 'app.bsky.graph.verification', limit: 100 }
+            );
+
+            if (verificationRecords.length > 0) {
+              hasVerifiedAnyone = true;
+              // Check if any record verifies the logged-in user
+              const matchingRecord = verificationRecords.find(record => record.value?.subject === session.did);
+              if (matchingRecord) {
+                foundVerificationForMe = matchingRecord;
               }
-              listRecordsCursor = response.data.cursor;
-            } catch (err) {
-              console.warn(`Could not listRecords for ${did} on ${pdsEndpoint}:`, err.message);
-              listRecordsCursor = undefined;
-              break;
             }
-          } while (listRecordsCursor);
+          } catch (err) {
+             // fetchAllPaginated already logs errors, just skip this user on error
+             console.warn(`Error processing records for ${profile.handle || did} on ${pdsEndpoint}`);
+          }
+          
+          // Return data for aggregation
+          return {
+             isMutual,
+             isFollow,
+             profile,
+             hasVerifiedAnyone,
+             foundVerificationForMe
+          };
+        });
 
-          if (hasVerifiedAnyone) {
-            if (isMutual) results.mutualsVerifiedAnyone++;
-            if (isFollow) results.followsVerifiedAnyone++;
-          }
-          if (foundVerificationForMe) {
-            const accountInfo = { ...profile, verification: foundVerificationForMe };
-            if (isMutual) results.mutualsVerifiedMe.push(accountInfo);
-            if (isFollow) results.followsVerifiedMe.push(accountInfo);
-          }
+        // Process results from the batch
+        const batchResults = await Promise.all(batchPromises);
+        batchResults.forEach(result => {
+           if (!result) return; // Skip if PDS lookup failed or other issue
+           if (result.hasVerifiedAnyone) {
+              if (result.isMutual) results.mutualsVerifiedAnyone++;
+              if (result.isFollow) results.followsVerifiedAnyone++;
+           }
+           if (result.foundVerificationForMe) {
+              const accountInfo = { ...result.profile, verification: result.foundVerificationForMe };
+              if (result.isMutual) results.mutualsVerifiedMe.push(accountInfo);
+              if (result.isFollow) results.followsVerifiedMe.push(accountInfo);
+           }
+        });
+
+        // Update state incrementally after each batch
+        setNetworkVerifications(prev => ({
+          ...prev,
+          mutualsVerifiedMe: [...results.mutualsVerifiedMe],
+          followsVerifiedMe: [...results.followsVerifiedMe],
+          mutualsVerifiedAnyone: results.mutualsVerifiedAnyone,
+          followsVerifiedAnyone: results.followsVerifiedAnyone,
         }));
-        setNetworkVerifications(prev => ({ ...prev, ...results }));
       }
+
+      console.log('checkNetworkVerifications: Check complete.', results);
       setNetworkStatusMessage("Network verification check complete.");
+
     } catch (error) {
       console.error('Error during network verification check:', error);
       setStatusMessage(`Error checking network: ${error.message || 'Unknown error'}`);
@@ -336,7 +387,7 @@ function Verifier() {
       setIsLoadingNetwork(false);
       setNetworkChecked(true);
     }
-  }, [agent, session, userInfo]);
+  }, [agent, session, userInfo]); // Keep dependencies
 
   useEffect(() => {
     if (agent) {

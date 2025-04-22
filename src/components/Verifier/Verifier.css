@@ -105,7 +105,6 @@
 .verifier-form-container {
   display: flex;
   gap: 10px;
-  align-items: center;
   flex-wrap: wrap; /* Allow wrapping */
   padding: 0px;
   border: 0px;
@@ -369,20 +368,21 @@
 .verifier-tooltip-text {
   visibility: hidden;
   opacity: 0;
-  width: 250px; /* Adjust width as needed */
-  background-color: var(--tooltip-bg, #333); /* Use variable or default */
+  width: auto; /* Allow content to determine width */
+  max-width: 250px; /* Keep a max width */
+  background-color: var(--tooltip-bg, #333);
   color: var(--tooltip-text, #fff);
   text-align: center;
   border-radius: 6px;
   padding: 8px 12px;
   position: absolute;
   z-index: 10;
-  bottom: 135%; /* Position above the icon */
-  left: 50%;
-  margin-left: -125px; /* Half of the width to center */
+  bottom: 135%;
+  left: 50%; /* Position the left edge at the center */
+  transform: translateX(-50%); /* Shift element left by half its own width */
   transition: opacity 0.3s ease, visibility 0.3s ease;
   box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-  font-size: 0.9em; /* Adjust font size */
+  font-size: 0.9em;
   line-height: 1.4;
 }
 
@@ -390,12 +390,25 @@
 .verifier-tooltip-text::after {
   content: "";
   position: absolute;
-  top: 100%; /* At the bottom of the tooltip */
+  top: 100%;
   left: 50%;
-  margin-left: -5px;
+  transform: translateX(-50%); /* Center the arrow */
   border-width: 5px;
   border-style: solid;
-  border-color: var(--tooltip-bg, #333) transparent transparent transparent; /* Arrow pointing down */
+  border-color: var(--tooltip-bg, #333) transparent transparent transparent;
+}
+
+/* Media Query for smaller screens */
+@media (max-width: 480px) {
+  .verifier-tooltip-text {
+    max-width: 200px; /* Reduce max width */
+    left: 10px; /* Anchor more towards left */
+    transform: translateX(0); /* Reset transform centering */
+  }
+  .verifier-tooltip-text::after {
+    left: 15px; /* Adjust arrow position */
+    transform: translateX(0);
+  }
 }
 
 .verifier-tooltip-container:hover .verifier-tooltip-text {

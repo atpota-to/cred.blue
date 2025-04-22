@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Agent } from '@atproto/api';
 import './Verifier.css';
@@ -108,23 +108,6 @@ async function getPdsEndpoint(did) {
   }
 }
 
-// --- Debounce Hook ---
-function useDebounce(value, delay) {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
-}
-// --- End Debounce Hook ---
-
 // Renamed component to Verifier
 function Verifier() {
   // Use the main app's AuthContext
@@ -151,15 +134,6 @@ function Verifier() {
   const [isCheckingValidity, setIsCheckingValidity] = useState(false);
   const [networkStatusMessage, setNetworkStatusMessage] = useState('');
   const [officialVerifiersStatus, setOfficialVerifiersStatus] = useState({});
-
-  // --- Autocomplete State ---
-  const [suggestions, setSuggestions] = useState([]);
-  const [isFetchingSuggestions, setIsFetchingSuggestions] = useState(false);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const debouncedSearchTerm = useDebounce(targetHandle, 300);
-  const suggestionsRef = useRef(null);
-  const inputRef = useRef(null);
-  // --- End Autocomplete State ---
 
   useEffect(() => {
     if (session) {
@@ -527,48 +501,6 @@ function Verifier() {
     }
   }, [session, checkOfficialVerification]);
 
-  const fetchSuggestions = useCallback(async (query) => {
-    if (!query || query.trim().length < 2) {
-      setSuggestions([]);
-      return;
-    }
-    setIsFetchingSuggestions(true);
-    try {
-      // *** Use direct fetch ***
-      const url = new URL('https://public.api.bsky.app/xrpc/app.bsky.actor.searchActorsTypeahead');
-      url.searchParams.append('q', query);
-      url.searchParams.append('limit', '5');
-      const response = await fetch(url.toString());
-      if (!response.ok) throw new Error(`Suggestions fetch failed: ${response.status}`);
-      const data = await response.json();
-      setSuggestions(data.actors || []);
-    } catch (error) {
-      console.error('Failed to fetch suggestions:', error);
-      setSuggestions([]);
-    } finally {
-      setIsFetchingSuggestions(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (debouncedSearchTerm && showSuggestions) {
-      fetchSuggestions(debouncedSearchTerm);
-    } else if (!debouncedSearchTerm) {
-      setSuggestions([]);
-    }
-  }, [debouncedSearchTerm, fetchSuggestions, showSuggestions]);
-
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (suggestionsRef.current && !suggestionsRef.current.contains(event.target) &&
-          inputRef.current && !inputRef.current.contains(event.target)) {
-        setShowSuggestions(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [suggestionsRef, inputRef]);
-
   const handleVerify = async (e) => {
     e.preventDefault();
     if (!agent || !session) return;
@@ -576,7 +508,6 @@ function Verifier() {
     setIsVerifying(true);
     setStatusMessage(`Verifying ${targetHandle}...`);
     setRevokeStatusMessage('');
-    setShowSuggestions(false);
     try {
       const profileRes = await agent.api.app.bsky.actor.getProfile({ actor: targetHandle });
       const targetDid = profileRes.data.did;
@@ -633,13 +564,6 @@ function Verifier() {
     }
   };
 
-  const handleSuggestionClick = (handle) => {
-    setTargetHandle(handle);
-    setSuggestions([]);
-    setShowSuggestions(false);
-    inputRef.current?.focus();
-  };
-
   // Handle loading and error states
   if (isAuthLoading) return <p>Loading authentication...</p>;
   if (authError) return <p>Authentication Error: {authError}. <a href="/login">Please login</a>.</p>;
@@ -674,7 +598,10 @@ function Verifier() {
         With Bluesky's new decentralized verification system, anyone can verify anyone else and any Bluesky client can choose which accounts to treat as "Trusted Verifiers".
       </p>
       <p className="verifier-intro-text">
-        Try verifying an account for yourself or check to see who has verified you! It's as simple as creating a verification record in your PDS that points to the account you want to verify.
+        Try verifying an account for yourself or check to see who has verified you! It's as simple as creating a verification record in your PDS that points to the account you want to verify. The record looks like this: 
+      </p>
+      <p>
+      app.bsky.graph.verification
       </p>
       </div>
 
@@ -684,16 +611,9 @@ function Verifier() {
         <p>Enter the handle of the user you want to verify (e.g., targetuser.bsky.social):</p>
           <form onSubmit={handleVerify} className="verifier-form-container" style={{ marginBottom: 0 }}>
             <input
-              ref={inputRef}
               type="text"
               value={targetHandle}
-              onChange={(e) => {
-                const newValue = e.target.value;
-                setTargetHandle(newValue);
-                setShowSuggestions(newValue.length >= 2);
-                if(newValue.length < 2) setSuggestions([]);
-              }}
-              onFocus={() => { if (targetHandle.length >= 2) setShowSuggestions(true); }}
+              onChange={(e) => setTargetHandle(e.target.value)}
               placeholder="targetuser.bsky.social"
               disabled={isAnyOperationInProgress}
               required
@@ -704,24 +624,6 @@ function Verifier() {
               {isVerifying ? 'Verifying...' : 'Verify Account'}
             </button>
           </form>
-          {showSuggestions && (suggestions.length > 0 || isFetchingSuggestions) && (
-            <ul className="autocomplete-items" ref={suggestionsRef}>
-              {isFetchingSuggestions && suggestions.length === 0 ? (
-                 <li className="autocomplete-item">Loading...</li>
-              ) : (
-                suggestions.map((actor) => (
-                  <li key={actor.did} className="autocomplete-item" onMouseDown={(e) => { e.preventDefault(); handleSuggestionClick(actor.handle); }}>
-                    <img src={actor.avatar} alt="" />
-                    <span className="verifier-suggestion-display-name">{actor.displayName || actor.handle}</span>
-                    <span className="verifier-suggestion-handle">@{actor.handle}</span>
-                  </li>
-                ))
-              )}
-              {suggestions.length === 0 && !isFetchingSuggestions && targetHandle.length >= 2 && (
-                 <li className="autocomplete-item">No users found matching "{targetHandle}"</li>
-              )}
-            </ul>
-          )}
       </div>
 
       {statusMessage && (

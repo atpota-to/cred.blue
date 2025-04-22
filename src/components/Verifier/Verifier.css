@@ -108,7 +108,7 @@
   flex-wrap: wrap; /* Allow wrapping */
   padding: 0px;
   border: 0px;
-  position: relative; /* Added for suggestion list positioning */
+  /* position: relative; */ /* Removed - no longer needed */
 }
 
 .verifier-input-field {
@@ -123,6 +123,7 @@
   font-family: inherit; /* Use main font */
   min-width: 200px; /* Ensure minimum width */
   margin: 0px;
+  text-align: left;
 }
 
 .verifier-input-field:hover,
@@ -185,7 +186,12 @@
 }
 
 .verifier-list {
+  list-style: none;
+  padding: 0;
+  margin: 0; /* Reset default ul margins */
   margin-top: 15px;
+  width: 100%; /* Added */
+  box-sizing: border-box; /* Added */
 }
 
 .verifier-list,
@@ -205,6 +211,8 @@
   margin-bottom: 10px;
   flex-wrap: wrap; /* Allow actions to wrap */
   gap: 10px;
+  width: 100%; /* Added */
+  box-sizing: border-box; /* Added */
 }
 .verifier-list-item-content {
   flex-grow: 1;

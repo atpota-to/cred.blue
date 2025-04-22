@@ -8,11 +8,12 @@ import { resolveHandleToDid, getServiceEndpointForDid } from '../../accountData'
 import MatterLoadingAnimation from '../MatterLoadingAnimation';
 import { Helmet } from 'react-helmet';
 import { useAuth } from '../../contexts/AuthContext';
+import Loading from '../Loading/Loading';
 
 const CollectionsFeed = () => {
   const { username } = useParams();
   const navigate = useNavigate();
-  const { isAuthenticated, checkAuthStatus } = useAuth();
+  const { isAuthenticated, loading: authLoading, session } = useAuth();
   
   // Initialize state variables
   const [handle, setHandle] = useState(username || '');
@@ -154,16 +155,6 @@ const CollectionsFeed = () => {
           }
           
           try {
-            // Verify authentication before making the request
-            const authResult = await checkAuthStatus();
-            
-            if (!authResult) {
-              setError('You are not authenticated. Please log in again.');
-              const returnUrl = encodeURIComponent(window.location.pathname);
-              navigate(`/login?returnUrl=${returnUrl}`);
-              return;
-            }
-            
             const response = await fetch(url, {
               credentials: 'include'
             });
@@ -171,7 +162,7 @@ const CollectionsFeed = () => {
             if (!response.ok) {
               if (response.status === 401) {
                 // Try to refresh auth once
-                const refreshResult = await checkAuthStatus();
+                const refreshResult = await isAuthenticated();
                 if (!refreshResult) {
                   setError('Your session has expired. Please log in again.');
                   const returnUrl = encodeURIComponent(window.location.pathname);
@@ -355,282 +346,148 @@ const CollectionsFeed = () => {
       setFetchingMore(false);
       setChartLoading(false);
     }
-  }, [navigate, checkAuthStatus]);
+  }, [useRkeyTimestamp, isAuthenticated, navigate, collectionCursors]);
   
   // Now define loadUserData after fetchCollectionRecords is defined
-  const loadUserData = useCallback(async (usernameOrDid) => {
-    if (!usernameOrDid || !isAuthenticated) {
-      setError('Please enter a username or DID, and ensure you are logged in.');
-      return;
-    }
-    
-    // Reset state for new search
+  const loadUserData = useCallback(async (userToLoad) => {
+    console.log(`loadUserData called for: ${userToLoad}`);
     setLoading(true);
-    setShowContent(false); // Hide content while loading
     setError('');
-    setDid('');
-    setServiceEndpoint('');
+    setSearchPerformed(true);
     setCollections([]);
-    setSelectedCollections([]);
     setRecords([]);
     setAllRecordsForChart([]);
+    setSelectedCollections([]);
     setCollectionCursors({});
-    
+    setDid('');
+    setHandle('');
+    setDisplayName('');
+    setServiceEndpoint('');
+    setDisplayCount(25); // Reset display count on new search
+
     try {
-      // First, verify authentication is still valid
-      const authResult = await checkAuthStatus();
-      
-      if (!authResult) {
-        setError('Your session has expired. Please log in again.');
-        setLoading(false);
-        setTimeout(() => {
-          const returnUrl = encodeURIComponent(window.location.pathname);
-          navigate(`/login?returnUrl=${returnUrl}`);
-        }, 3000);
-        return;
+      const identifier = userToLoad || session?.handle;
+      if (!identifier) {
+        throw new Error("No user identifier available to load data.");
       }
-      
-      // Continue with resolving the handle to DID
-      let userDid = usernameOrDid;
-      
-      // If input doesn't look like a DID, try to resolve it as a handle
-      if (!userDid.startsWith('did:')) {
-        try {
-          userDid = await resolveHandleToDid(usernameOrDid);
-        } catch (resolveErr) {
-          setError(`Could not resolve handle: ${resolveErr.message}`);
-          setLoading(false);
-          return;
-        }
+
+      // Resolve identifier first
+      const resolveResponse = await fetch(`/api/resolve-identifier?identifier=${encodeURIComponent(identifier)}`);
+      if (!resolveResponse.ok) {
+        throw new Error(`Failed to resolve identifier: ${identifier}`);
       }
-      
-      // Get service endpoint
-      let endpoint;
-      try {
-        endpoint = await getServiceEndpointForDid(userDid);
-        setServiceEndpoint(endpoint);
-      } catch (endpointError) {
-        console.error('Error getting service endpoint:', endpointError);
-        setError(`Could not determine PDS endpoint for "${userDid}". The user's server may be offline.`);
-        setInitialLoad(false);
-        setLoading(false);
-        return;
+      const resolveData = await resolveResponse.json();
+      const resolvedDid = resolveData.did;
+      const resolvedHandle = resolveData.handle;
+      setDid(resolvedDid);
+      setHandle(resolvedHandle);
+      console.log('Resolved:', resolvedDid, resolvedHandle);
+
+      // Fetch collections using resolved DID
+      // Assume default endpoint or fetch dynamically if needed
+      const defaultEndpoint = 'https://bsky.social'; // Or determine dynamically
+      setServiceEndpoint(defaultEndpoint);
+
+      // Use server-side endpoint for collections
+      const collectionsResponse = await fetch(`/api/collections/${encodeURIComponent(resolvedDid)}?endpoint=${encodeURIComponent(defaultEndpoint)}`, {
+        credentials: 'include'
+      });
+
+      if (!collectionsResponse.ok) {
+         if (collectionsResponse.status === 401) {
+            // No need to call checkAuthStatus, just redirect
+            throw new Error('Authentication required. Please log in again.');
+         }
+         throw new Error(`Failed to fetch collections for ${resolvedDid}`);
       }
-      
-      // Fetch profile information
-      try {
-        const publicApiEndpoint = "https://public.api.bsky.app";
-        const profileResponse = await fetch(`${publicApiEndpoint}/xrpc/app.bsky.actor.getProfile?actor=${encodeURIComponent(userDid)}`);
-        
-        if (!profileResponse.ok) {
-          throw new Error(`Error fetching profile: ${profileResponse.statusText}`);
-        }
-        
-        const profileData = await profileResponse.json();
-        setHandle(profileData.handle);
-        setDisplayName(profileData.displayName || profileData.handle);
-      } catch (profileError) {
-        console.error('Error fetching profile:', profileError);
-        // Continue without profile data, not critical
+
+      const collectionsData = await collectionsResponse.json();
+      const fetchedCollections = collectionsData.collections || [];
+      setDisplayName(collectionsData.displayName || resolvedHandle);
+      setCollections(fetchedCollections);
+      setSelectedCollections(fetchedCollections); // Select all by default
+      console.log('Fetched collections:', fetchedCollections);
+
+      // Fetch records for all collections initially for the chart
+      if (fetchedCollections.length > 0) {
+        await fetchCollectionRecords(resolvedDid, defaultEndpoint, fetchedCollections);
       }
-      
-      // Use our server-side API to fetch collections
-      let retryCount = 0;
-      const maxRetries = 2;
-      let collectionsData;
-      
-      while (retryCount <= maxRetries) {
-        try {
-          // Verify authentication before making the request
-          const authResult = await checkAuthStatus();
-          
-          if (!authResult) {
-            setError('Your session has expired. Please log in again.');
-            setLoading(false);
-            setTimeout(() => {
-              const returnUrl = encodeURIComponent(window.location.pathname);
-              navigate(`/login?returnUrl=${returnUrl}`);
-            }, 3000);
-            return;
-          }
-          
-          const collectionsResponse = await fetch(`/api/collections/${encodeURIComponent(userDid)}?endpoint=${encodeURIComponent(endpoint)}`, {
-            credentials: 'include'
-          });
-          
-          if (!collectionsResponse.ok) {
-            if (collectionsResponse.status === 401) {
-              // Try to refresh auth once more
-              const refreshResult = await checkAuthStatus();
-              if (!refreshResult) {
-                setError('You are not authenticated. Please log in to continue.');
-                setLoading(false);
-                setTimeout(() => {
-                  const returnUrl = encodeURIComponent(window.location.pathname);
-                  navigate(`/login?returnUrl=${returnUrl}`);
-                }, 3000);
-                return;
-              }
-              // If we're still here, try again
-              retryCount++;
-              continue;
-            }
-            
-            // Try to parse the error response
-            let errorMessage;
-            try {
-              const errorData = await collectionsResponse.json();
-              errorMessage = errorData?.error || errorData?.details || collectionsResponse.statusText;
-            } catch (jsonErr) {
-              errorMessage = collectionsResponse.statusText || `HTTP ${collectionsResponse.status}`;
-            }
-            
-            throw new Error(`Error fetching collections: ${errorMessage}`);
-          }
-          
-          collectionsData = await collectionsResponse.json();
-          break; // Success, exit the retry loop
-        } catch (err) {
-          console.error(`Attempt ${retryCount + 1} failed:`, err);
-          if (retryCount === maxRetries) {
-            // This was our last attempt, propagate the error
-            throw err;
-          }
-          // Wait before retrying
-          await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
-          retryCount++;
-        }
-      }
-      
-      if (collectionsData.collections && collectionsData.collections.length > 0) {
-        const sortedCollections = [...collectionsData.collections].sort();
-        setCollections(sortedCollections);
-        // By default, select all collections
-        setSelectedCollections(sortedCollections);
-        
-        // Fetch records for each collection
-        try {
-          await fetchCollectionRecords(userDid, endpoint, sortedCollections);
-        } catch (recordsError) {
-          console.error('Error fetching collection records:', recordsError);
-          setError(`Successfully loaded collections, but could not load records: ${recordsError.message}`);
-          // Continue with the collections we have
-        }
-      } else {
-        setError('No collections found for this user.');
-      }
-      
-      setSearchPerformed(true);
-      setInitialLoad(false);
-      setLoading(false);
-      // Add a slight delay before showing content for smooth transition
-      setTimeout(() => setShowContent(true), 100);
+
     } catch (err) {
       console.error('Error loading user data:', err);
-      
-      // Provide more user-friendly error messages
-      let userMessage = 'An error occurred while loading data.';
-      
-      if (err.message) {
-        if (err.message.includes('authenticated')) {
-          userMessage = 'Authentication error: Please log in again.';
-          setTimeout(() => {
-            const returnUrl = encodeURIComponent(window.location.pathname);
-            navigate(`/login?returnUrl=${returnUrl}`);
-          }, 3000);
-        } else if (err.message.includes('fetch')) {
-          userMessage = 'Network error: Could not connect to the server.';
-        } else if (err.message.includes('collections')) {
-          userMessage = `Collections error: ${err.message}`;
-        } else {
-          userMessage = err.message;
-        }
+      let userMessage = 'Failed to load user data. Please check the handle and try again.';
+      if (err.message?.includes('Authentication required')) {
+        userMessage = 'Authentication error. Please log in again.';
+        // Redirect to login
+        const returnUrl = encodeURIComponent(window.location.pathname);
+        navigate(`/login?returnUrl=${returnUrl}`);
+        return; // Stop further execution
       }
-      
       setError(userMessage);
-      setInitialLoad(false);
+    } finally {
       setLoading(false);
-      setShowContent(true); // Show content even on error so user can see error message
+      setInitialLoad(false);
+      setShowContent(true);
     }
-  }, [navigate, checkAuthStatus]);
+  }, [session?.handle, navigate]);
   
   // Now place useEffects after all the callbacks are defined
   
-  // Verify authentication first
+  // Effect to handle initial authentication and data loading
   useEffect(() => {
-    const verifyAuth = async () => {
-      try {
-        setLoading(true);
-        setInitialLoad(true);
-        setShowContent(false);
-        
-        // Reset states if username changes
-        if (username) {
-          setError('');
-          setSearchTerm(username);
-        }
-        
-        const authResult = await checkAuthStatus();
-        
-        if (!authResult) {
-          console.log('Not authenticated, redirecting to login');
-          // Save the current path for redirect after login
-          const returnUrl = encodeURIComponent(window.location.pathname);
-          navigate(`/login?returnUrl=${returnUrl}`);
-          return;
-        }
-        
-        // If a username is provided in the URL, load that user's data
-        if (username && authResult) {
-          console.log('Username provided in URL, loading data for:', username);
-          loadUserData(username);
-        } else {
-          // Only set loading to false if we're not loading a specific user
-          setLoading(false);
-          setInitialLoad(false);
-          setShowContent(true);
-        }
-      } catch (err) {
-        console.error('Auth verification failed:', err);
-        setError('Authentication failed. Please try logging in again.');
+    // Wait for AuthProvider to finish loading
+    if (authLoading) {
+        console.log("CollectionsFeed: Waiting for AuthProvider...");
+        return;
+    }
+
+    console.log("CollectionsFeed: AuthProvider loaded. isAuthenticated:", isAuthenticated);
+    setInitialLoad(true); // Start initial load process
+    setShowContent(false);
+
+    if (!isAuthenticated) {
+        console.log('CollectionsFeed: Not authenticated, redirecting to login');
+        const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+        navigate(`/login?returnUrl=${returnUrl}`);
+        return; // Stop execution
+    }
+
+    // If authenticated, proceed to load data
+    setError(''); // Clear previous errors
+    if (username) {
+        console.log('CollectionsFeed: Authenticated, username provided, loading data for:', username);
+        setSearchTerm(username); // Update search term from URL
+        loadUserData(username);
+    } else if (session?.handle) {
+        // If no username in URL, load data for the logged-in user
+        console.log('CollectionsFeed: Authenticated, no username in URL, loading data for logged-in user:', session.handle);
+        setSearchTerm(session.handle);
+        loadUserData(session.handle);
+    } else {
+        // Authenticated but no username in URL and no handle in session (should not happen ideally)
+        console.error('CollectionsFeed: Authenticated but no identifier found to load data.');
+        setError('Could not determine user to load data for.');
         setLoading(false);
         setInitialLoad(false);
         setShowContent(true);
-        
-        // Add a delay before redirecting to show the error message
-        setTimeout(() => {
-          navigate('/login');
-        }, 2000);
-      }
-    };
-    
-    verifyAuth();
-    
-    // Set up periodic auth checks
-    const interval = setInterval(async () => {
-      const authResult = await checkAuthStatus();
-      if (!authResult && isAuthenticated) {
-        // Session was lost during browsing
-        setError('Your session has expired. Please log in again.');
-        setInitialLoad(false);
-        // Show the error for 3 seconds before redirecting
-        setTimeout(() => {
-          const returnUrl = encodeURIComponent(window.location.pathname);
-          navigate(`/login?returnUrl=${returnUrl}`);
-        }, 3000);
-      }
-    }, 30000); // Check every 30 seconds
-    
-    // Safety timeout to ensure initialLoad is cleared after 10 seconds maximum
+    }
+
+    // Safety timeout for initial load UI state
     const loadingTimeout = setTimeout(() => {
-      setInitialLoad(false);
-    }, 10000);
-    
+      if (initialLoad) {
+         console.warn("CollectionsFeed: Initial load timeout reached.");
+         setInitialLoad(false);
+         // Decide whether to show content or error based on current state
+         if (!error) setShowContent(true);
+      }
+    }, 15000); // Increase timeout slightly
+
+    // Cleanup function (no interval to clear anymore)
     return () => {
-      clearInterval(interval);
       clearTimeout(loadingTimeout);
     };
-  }, [isAuthenticated, checkAuthStatus, navigate, username, loadUserData]);
+    // Depend on auth state and username param
+  }, [isAuthenticated, authLoading, navigate, username, session?.handle, loadUserData]);
   
   // Effect to watch for selected collections changes
   useEffect(() => {
@@ -709,90 +566,74 @@ const CollectionsFeed = () => {
   
   // Handle refresh button click - only updates the feed, not the chart
   const handleRefresh = async () => {
+    // Check auth status directly
+    if (!isAuthenticated) {
+        console.warn("Refresh cancelled: User not authenticated.");
+        navigate('/login'); // Redirect to login if session lost
+        return;
+    }
     if (did && serviceEndpoint) {
-      // Set a loading state but not for the chart
       setLoading(true);
-      
-      // Reset display count to show only the first 25 records after refresh
       setDisplayCount(25);
-      
       try {
-        // Fetch just the most recent records for the feed display
-        const refreshOnlyFeed = async () => {
           let recentRecords = [];
-          
-          // Process each selected collection sequentially
           for (const collection of selectedCollections) {
-            try {
-              // Use server-side API endpoint for fetching records
-              const url = `/api/collections/${encodeURIComponent(did)}/records?endpoint=${encodeURIComponent(serviceEndpoint)}&collection=${encodeURIComponent(collection)}&limit=25`;
-              
-              const response = await fetch(url, {
-                credentials: 'include'
-              });
-              
-              if (!response.ok) {
-                if (response.status === 401) {
-                  // Handle unauthorized
-                  checkAuthStatus();
-                  throw new Error('Authentication required. Please log in again.');
-                }
-                console.error(`Error refreshing ${collection}: ${response.statusText}`);
-                continue; // Skip this collection but continue with others
+              try {
+                  const url = `/api/collections/${encodeURIComponent(did)}/records?endpoint=${encodeURIComponent(serviceEndpoint)}&collection=${encodeURIComponent(collection)}&limit=25`;
+                  const response = await fetch(url, { credentials: 'include' });
+                  if (!response.ok) {
+                      if (response.status === 401) {
+                          // Directly navigate to login on 401
+                          throw new Error('Authentication required. Please log in again.');
+                      }
+                      console.error(`Error refreshing ${collection}: ${response.statusText}`);
+                      continue;
+                  }
+                  const data = await response.json();
+                  if (data.records && data.records.length > 0) {
+                      const processedRecords = data.records.map(record => {
+                          const contentTimestamp = extractTimestamp(record);
+                          const rkey = record.uri.split('/').pop();
+                          const rkeyTimestamp = tidToTimestamp(rkey);
+                          return {
+                              ...record,
+                              collection,
+                              collectionType: record.value?.$type || collection,
+                              contentTimestamp,
+                              rkeyTimestamp,
+                              rkey,
+                          };
+                      });
+                      recentRecords = [...recentRecords, ...processedRecords];
+                  }
+              } catch (err) {
+                  console.error(`Error refreshing collection ${collection}:`, err);
+                  if (err.message?.includes('Authentication required')) throw err; // Re-throw auth error
+                  // Continue with other collections
               }
-              
-              const data = await response.json();
-              
-              if (data.records && data.records.length > 0) {
-                // Process the records with timestamps
-                const processedRecords = data.records.map(record => {
-                  const contentTimestamp = extractTimestamp(record);
-                  const rkey = record.uri.split('/').pop();
-                  const rkeyTimestamp = tidToTimestamp(rkey);
-                  
-                  return {
-                    ...record,
-                    collection,
-                    collectionType: record.value?.$type || collection,
-                    contentTimestamp,
-                    rkeyTimestamp,
-                    rkey,
-                  };
-                });
-                
-                // Add to our records array
-                recentRecords = [...recentRecords, ...processedRecords];
-              }
-            } catch (err) {
-              console.error(`Error refreshing collection ${collection}:`, err);
-              // Continue with other collections
-            }
           }
-          
-          // Sort the refreshed records by timestamp (newest first)
           const sortedRecords = recentRecords.filter(record => {
-            if (useRkeyTimestamp) {
-              return record.rkeyTimestamp !== null;
-            } else {
-              return record.contentTimestamp !== null;
-            }
+              if (useRkeyTimestamp) {
+                return record.rkeyTimestamp !== null;
+              } else {
+                return record.contentTimestamp !== null;
+              }
           }).sort((a, b) => {
-            const aTime = useRkeyTimestamp ? a.rkeyTimestamp : a.contentTimestamp;
-            const bTime = useRkeyTimestamp ? b.rkeyTimestamp : b.contentTimestamp;
-            return new Date(bTime) - new Date(aTime);
+              const aTime = useRkeyTimestamp ? a.rkeyTimestamp : a.contentTimestamp;
+              const bTime = useRkeyTimestamp ? b.rkeyTimestamp : b.contentTimestamp;
+              return new Date(bTime) - new Date(aTime);
           });
-          
-          // Only update the feed display records, not the chart data
           setRecords(sortedRecords.slice(0, 25));
-        };
-        
-        await refreshOnlyFeed();
       } catch (err) {
-        console.error("Error during feed refresh:", err);
-        setError('Failed to refresh records. Please try again.');
+          console.error("Error during feed refresh:", err);
+          if (err.message?.includes('Authentication required')) {
+              const returnUrl = encodeURIComponent(window.location.pathname);
+              navigate(`/login?returnUrl=${returnUrl}`);
+          } else {
+              setError('Failed to refresh records. Please try again.');
+          }
       } finally {
-        // Ensure loading state is reset
-        setLoading(false);
+          setLoading(false);
       }
     }
   };
@@ -801,7 +642,8 @@ const CollectionsFeed = () => {
   const handleLoadMore = async () => {
     // Verify authentication before proceeding
     if (!isAuthenticated) {
-      checkAuthStatus();
+      console.warn("Load more cancelled: User not authenticated.");
+      navigate('/login'); // Redirect to login if session lost
       return;
     }
 

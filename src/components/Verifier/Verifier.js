@@ -333,7 +333,7 @@ function Verifier() {
       let currentStatus = 'checking';
       try {
         if (!verifierIdentifier.startsWith('did:')) {
-          const resolveResult = await publicAgent.resolveHandle({ handle: verifierIdentifier });
+          const resolveResult = await publicAgent.api.com.atproto.identity.resolveHandle({ handle: verifierIdentifier });
           verifierDid = resolveResult.data.did;
         } else {
           verifierDid = verifierIdentifier;

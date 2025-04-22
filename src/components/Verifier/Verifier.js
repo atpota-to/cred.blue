@@ -647,14 +647,13 @@ function Verifier() {
   }
 
   const isAnyOperationInProgress = isVerifying || isRevoking || isLoadingVerifications || isLoadingNetwork || isCheckingValidity;
-  const trustedVerifiersTooltip = `Checking if any of these Trusted Verifiers have created a verification record for your DID: ${TRUSTED_VERIFIERS.join(', ')}.`;
 
   return (
     <div className="verifier-container">
       <div className="verifier-intro-container">
       <h1>Bluesky Verifier Tool</h1>
       <p className="verifier-intro-text">
-        With Bluesky's new decentralized verification system, anyone can verify anyone else and any Bluesky client can choose which accounts to treat as "Trusted Verifiers". It's a first-of-its-kind verification system for a mainstream social platform of this size. Try verifying an account for yourself or check to see who has verified you!
+        With Bluesky's new decentralized verification system, anyone can verify anyone else and any Bluesky client can choose which accounts to treat as "Trusted Verifiers". Try verifying an account for yourself or check to see who has verified you! It's as simple as creating a verification record in your PDS that points to the account you want to verify.
       </p>
       </div>
 
@@ -681,7 +680,7 @@ function Verifier() {
               autoComplete="off"
             />
             <button type="submit" disabled={isVerifying || !targetHandle} className="verifier-submit-button">
-              {isVerifying ? 'Verifying...' : 'Create Verification Record'}
+              {isVerifying ? 'Verifying...' : 'Verify Account'}
             </button>
           </form>
           {showSuggestions && (suggestions.length > 0 || isFetchingSuggestions) && (
@@ -774,7 +773,6 @@ Check yours: https://cred.blue/verify`;
       <div className="verifier-section">
         <div className="verifier-list-header">
           <h2>Accounts You've Verified</h2>
-          <button onClick={fetchVerifications} disabled={isAnyOperationInProgress} className="verifier-action-button verifier-refresh-button">Refresh List</button>
         </div>
 
         {revokeStatusMessage && (

@@ -86,10 +86,13 @@
 /* Form Styles */
 .verifier-section {
   background: var(--navbar-bg);
-  /* border: 1px solid var(--card-border); */ /* Remove border to match alt-card */
-  border-radius: 12px;
-  padding: 40px 30px; /* Increase padding to match alt-card */
-  margin-bottom: 20px;
+  border: 5px solid var(--card-border); /* Match alt-card border */
+  border-radius: 12px; /* Match alt-card radius */
+  box-shadow: none; /* Match alt-card shadow */
+  padding: 40px 30px; /* Keep increased padding or adjust if alt-card is different */
+  margin: 30px auto; /* Match alt-card margin */
+  max-width: 95%; /* Match alt-card max-width */
+  /* margin-bottom: 20px; */ /* Remove specific margin-bottom */
 }
 
 .verifier-input-container {

@@ -328,47 +328,66 @@ function Verifier() {
     const initialStatuses = {};
     TRUSTED_VERIFIERS.forEach(id => { initialStatuses[id] = 'checking'; });
     setOfficialVerifiersStatus(initialStatuses);
-    const publicAgent = new Agent({ service: 'https://public.api.bsky.app' });
+    // No need for publicAgent instance here
+    // const publicAgent = new Agent({ service: 'https://public.api.bsky.app' });
 
     await Promise.all(TRUSTED_VERIFIERS.map(async (verifierIdentifier) => {
       let verifierDid = null;
       let verifierHandle = verifierIdentifier;
       let currentStatus = 'checking';
       try {
+        // Resolve handle using direct fetch if necessary
         if (!verifierIdentifier.startsWith('did:')) {
-          const resolveResult = await publicAgent.api.com.atproto.identity.resolveHandle({ handle: verifierIdentifier });
-          verifierDid = resolveResult.data.did;
+          const resolveUrl = `https://public.api.bsky.app/xrpc/com.atproto.identity.resolveHandle?handle=${encodeURIComponent(verifierIdentifier)}`;
+          const resolveResponse = await fetch(resolveUrl);
+          if (!resolveResponse.ok) throw new Error(`Resolve handle failed: ${resolveResponse.status}`);
+          const resolveData = await resolveResponse.json();
+          verifierDid = resolveData.did;
         } else {
           verifierDid = verifierIdentifier;
+          // Optionally fetch profile handle for display using direct fetch
           try {
-            const profileRes = await publicAgent.api.app.bsky.actor.getProfile({ actor: verifierDid });
-            verifierHandle = profileRes.data.handle;
+            const profileUrl = `https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor=${encodeURIComponent(verifierDid)}`;
+            const profileResponse = await fetch(profileUrl);
+            if (profileResponse.ok) {
+                const profileData = await profileResponse.json();
+                verifierHandle = profileData.handle;
+            }
           } catch { /* ignore */ }
         }
+
         if (!verifierDid) throw new Error('Could not resolve identifier');
         const pdsEndpoint = await getPdsEndpoint(verifierDid);
         if (!pdsEndpoint) throw new Error('Could not find PDS');
 
         let listRecordsCursor = undefined;
         let foundMatch = false;
-        const tempPublicAgent = new Agent({ service: pdsEndpoint });
-
+        // No agent needed here, use fetch
         do {
           try {
-            const response = await tempPublicAgent.api.com.atproto.repo.listRecords({
-               repo: verifierDid,
-               collection: 'app.bsky.graph.verification',
-               limit: 100,
-               cursor: listRecordsCursor
-            });
-            const records = response.data.records || [];
+            const listParams = new URLSearchParams({ repo: verifierDid, collection: 'app.bsky.graph.verification', limit: '100' });
+            if (listRecordsCursor) listParams.set('cursor', listRecordsCursor);
+            // *** Use direct fetch for listRecords ***
+            const listRecordsUrl = `${pdsEndpoint}/xrpc/com.atproto.repo.listRecords?${listParams.toString()}`;
+            const listResponse = await fetch(listRecordsUrl);
+
+            if (!listResponse.ok) {
+               if (listResponse.status !== 400) {
+                  console.warn(`Failed fetch for ${verifierHandle}: ${listResponse.status}`);
+                  throw new Error(`Fetch failed with status ${listResponse.status}`);
+               }
+               break; // Stop on 400 or other errors
+            }
+
+            const listData = await listResponse.json();
+            const records = listData.records || [];
             const matchingRecord = records.find(record => record.value?.subject === session.did);
             if (matchingRecord) {
               currentStatus = 'verified';
               foundMatch = true;
               break;
             }
-            listRecordsCursor = response.data.cursor;
+            listRecordsCursor = listData.cursor;
           } catch (err) {
              console.warn(`Could not listRecords for ${verifierDid} on ${pdsEndpoint}:`, err.message);
              listRecordsCursor = undefined;
@@ -400,12 +419,14 @@ function Verifier() {
     }
     setIsFetchingSuggestions(true);
     try {
-      const publicAgent = new Agent({ service: 'https://public.api.bsky.app' });
-      const response = await publicAgent.api.app.bsky.actor.searchActorsTypeahead({
-         q: query,
-         limit: 5
-      });
-      setSuggestions(response.data.actors || []);
+      // *** Use direct fetch ***
+      const url = new URL('https://public.api.bsky.app/xrpc/app.bsky.actor.searchActorsTypeahead');
+      url.searchParams.append('q', query);
+      url.searchParams.append('limit', '5');
+      const response = await fetch(url.toString());
+      if (!response.ok) throw new Error(`Suggestions fetch failed: ${response.status}`);
+      const data = await response.json();
+      setSuggestions(data.actors || []);
     } catch (error) {
       console.error('Failed to fetch suggestions:', error);
       setSuggestions([]);

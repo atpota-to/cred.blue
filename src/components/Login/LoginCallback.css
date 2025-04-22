@@ -1,0 +1,34 @@
+.login-callback-container {
+  padding: 40px;
+  text-align: center;
+  max-width: 600px;
+  margin: 40px auto;
+  background-color: var(--navbar-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  color: var(--text);
+}
+
+.status-message {
+  color: var(--text-muted, var(--text)); /* Fallback to --text if --text-muted is not defined */
+  font-weight: bold;
+}
+
+.error-message {
+  color: var(--error, #ff4444); /* Fallback to red if --error is not defined */
+  font-weight: bold;
+}
+
+.home-button {
+   margin-top: 20px;
+   background-color: var(--button-bg);
+   color: var(--button-text);
+   border: none;
+   padding: 10px 20px;
+   border-radius: 5px;
+   cursor: pointer;
+}
+
+.home-button:hover {
+   background-color: var(--button-hover-bg, #0056b3); /* Fallback if --button-hover-bg is not defined */
+} 

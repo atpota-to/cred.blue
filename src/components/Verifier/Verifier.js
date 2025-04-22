@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useAuth } from '../../contexts/AuthContext'; // Updated import path
+import { useAuth } from '../../contexts/AuthContext';
 import { Agent } from '@atproto/api';
-import './Verifier.css'; // Updated CSS import
+import './Verifier.css';
 
 // Define trusted verifiers (updated list)
 const TRUSTED_VERIFIERS = [
@@ -16,30 +16,20 @@ async function fetchAllPaginated(agentInstance, apiMethod, initialParams) {
   let results = [];
   let cursor = initialParams.cursor;
   const params = { ...initialParams };
-  let operationName = apiMethod.name; // Get the name for logging
-
-  // Attempt to determine a more specific name if bound
-  if (apiMethod.name === 'bound dispatch') {
-      const boundFnString = apiMethod.toString();
-      // This is hacky, relies on internal representation which might change
-      const match = boundFnString.match(/Target function: (\w+)/);
-      if (match && match[1]) operationName = match[1];
-  }
+  let operationName = apiMethod.name.replace('bound ', '');
 
   do {
     try {
       if (cursor) {
         params.cursor = cursor;
       }
-      // Call the method bound to the correct agent context
       const response = await apiMethod(params);
-      const listKey = Object.keys(response.data).find(key => Array.isArray(response.data[key]));
-      if (listKey && response.data[listKey]) {
-          results = results.concat(response.data[listKey]);
+      const listKey = Object.keys(response.data || response).find(key => Array.isArray((response.data || response)[key]));
+      if (listKey && (response.data || response)[listKey]) {
+          results = results.concat((response.data || response)[listKey]);
       }
-      cursor = response.data.cursor;
+      cursor = (response.data || response).cursor;
     } catch (error) {
-      // Use the determined operation name in the error message
       console.error(`Error during paginated fetch for ${operationName}:`, error);
       cursor = undefined;
     }
@@ -55,7 +45,6 @@ async function getPdsEndpoint(did) {
     didDocUrl = `https://plc.directory/${did}`;
   } else if (did.startsWith('did:web:')) {
     const domain = did.substring(8); // Extract domain after 'did:web:'
-    // Decode percent-encoded characters in domain (e.g., for ports)
     const decodedDomain = decodeURIComponent(domain);
     didDocUrl = `https://${decodedDomain}/.well-known/did.json`;
   } else {
@@ -64,7 +53,6 @@ async function getPdsEndpoint(did) {
   }
 
   try {
-    console.log(`Fetching DID document from: ${didDocUrl}`); // Log the URL being fetched
     const response = await fetch(didDocUrl);
     if (!response.ok) {
       console.warn(`Could not resolve DID document for ${did} at ${didDocUrl}: ${response.status}`);
@@ -91,8 +79,6 @@ function useDebounce(value, delay) {
     const handler = setTimeout(() => {
       setDebouncedValue(value);
     }, delay);
-
-    // Cancel the timeout if value changes (also on delay change or unmount)
     return () => {
       clearTimeout(handler);
     };
@@ -126,27 +112,22 @@ function Verifier() {
   const [networkChecked, setNetworkChecked] = useState(false);
   const [isCheckingValidity, setIsCheckingValidity] = useState(false);
   const [networkStatusMessage, setNetworkStatusMessage] = useState('');
-  const [officialVerifiersStatus, setOfficialVerifiersStatus] = useState({}); // Stores status per verifier identifier
+  const [officialVerifiersStatus, setOfficialVerifiersStatus] = useState({});
 
-  // --- Autocomplete State --- (Keep as is)
+  // --- Autocomplete State ---
   const [suggestions, setSuggestions] = useState([]);
   const [isFetchingSuggestions, setIsFetchingSuggestions] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const debouncedSearchTerm = useDebounce(targetHandle, 300); // 300ms debounce
-  const suggestionsRef = useRef(null); // Ref for suggestions container
-  const inputRef = useRef(null); // Ref for input field
+  const debouncedSearchTerm = useDebounce(targetHandle, 300);
+  const suggestionsRef = useRef(null);
+  const inputRef = useRef(null);
   // --- End Autocomplete State ---
 
   useEffect(() => {
-    // If session exists, create an Agent instance
     if (session) {
-      // The session object from AuthContext IS the session manager
-      // Pass it directly to the Agent constructor.
       const agentInstance = new Agent(session);
       setAgent(agentInstance);
 
-      // Fetch logged-in user's profile info using the authenticated API
-      // Use the DID directly from the session object from useAuth()
       agentInstance.getProfile({ actor: session.did })
         .then(res => {
           console.log('Logged-in user profile fetched successfully:', res.data);
@@ -154,47 +135,37 @@ function Verifier() {
         })
         .catch(err => {
           console.error("Failed to fetch user profile:", err);
-          // Attempt to use basic info from session as fallback
           setUserInfo({ handle: session.handle, displayName: session.displayName || session.handle, did: session.did });
         });
     } else {
       setAgent(null);
       setUserInfo(null);
     }
-    // No redirection here, handled by main app routing if needed
   }, [session]);
 
-  // Fetch all verification records created by the current user
-  const fetchVerifications = async () => {
+  const fetchVerifications = useCallback(async () => {
     if (!agent || !session) return;
-
     setIsLoadingVerifications(true);
     try {
-      // Use direct agent method
       const response = await agent.listRecords({
         repo: session.did,
         collection: 'app.bsky.graph.verification',
         limit: 100,
       });
-
       console.log('Fetched verifications:', response.data);
-
-      // If we have records, set them in state
       if (response.data.records) {
-        const formattedVerifications = response.data.records.map(record => ({
+        const formatted = response.data.records.map(record => ({
           uri: record.uri,
           cid: record.cid,
           handle: record.value.handle,
           displayName: record.value.displayName,
           subject: record.value.subject,
           createdAt: record.value.createdAt,
-          isValid: true, // Default, will be checked later
+          isValid: true,
           validityChecked: false
         }));
-        setVerifications(formattedVerifications);
-
-        // Check validity of each verification
-        checkVerificationsValidity(formattedVerifications);
+        setVerifications(formatted);
+        checkVerificationsValidity(formatted);
       } else {
         setVerifications([]);
       }
@@ -204,127 +175,83 @@ function Verifier() {
     } finally {
       setIsLoadingVerifications(false);
     }
-  };
+  }, [agent, session]);
 
-  // Check if verifications are still valid (handle/displayName still match)
-  const checkVerificationsValidity = async (verificationsList) => {
+  const checkVerificationsValidity = useCallback(async (verificationsList) => {
     if (!agent || verificationsList.length === 0) return;
-
     setIsCheckingValidity(true);
     const updatedVerifications = [...verificationsList];
-
     try {
-      // Process in batches to avoid too many concurrent requests
       const batchSize = 5;
       for (let i = 0; i < updatedVerifications.length; i += batchSize) {
         const batch = updatedVerifications.slice(i, i + batchSize);
-
         await Promise.all(batch.map(async (verification, index) => {
           try {
-            // Use direct agent method
-            const profileRes = await agent.getProfile({
-              actor: verification.handle
-            });
-
-            // Check if handle and displayName still match
+            const profileRes = await agent.getProfile({ actor: verification.handle });
             const currentHandle = profileRes.data.handle;
             const currentDisplayName = profileRes.data.displayName || profileRes.data.handle;
-
-            // Update verification validity
             const batchIndex = i + index;
             updatedVerifications[batchIndex].validityChecked = true;
             updatedVerifications[batchIndex].isValid =
               currentHandle === verification.handle &&
               currentDisplayName === verification.displayName;
-
-            // If not valid, store current values for reference
             if (!updatedVerifications[batchIndex].isValid) {
               updatedVerifications[batchIndex].currentHandle = currentHandle;
               updatedVerifications[batchIndex].currentDisplayName = currentDisplayName;
             }
-
-            // Update state as we go to show progress
             setVerifications([...updatedVerifications]);
           } catch (err) {
             console.error(`Failed to check validity for ${verification.handle}:`, err);
-            // Mark as could not check
             const batchIndex = i + index;
             updatedVerifications[batchIndex].validityChecked = true;
             updatedVerifications[batchIndex].isValid = false;
             updatedVerifications[batchIndex].validityError = true;
+            setVerifications([...updatedVerifications]);
           }
         }));
       }
-
       console.log('Verified all records validity:', updatedVerifications);
     } catch (error) {
       console.error('Failed to check verifications validity:', error);
     } finally {
       setIsCheckingValidity(false);
     }
-  };
+  }, [agent]);
 
-  // Updated function: Check mutuals (authenticated) and all follows (public)
-  const checkNetworkVerifications = async () => {
-    // Ensure authenticated agent is available for mutuals check
+  const checkNetworkVerifications = useCallback(async () => {
     if (!agent || !session || !userInfo) return;
-
     setIsLoadingNetwork(true);
     setNetworkChecked(false);
-    // Reset state
-    setNetworkVerifications({
-        mutualsVerifiedMe: [], followsVerifiedMe: [],
-        mutualsVerifiedAnyone: 0, followsVerifiedAnyone: 0,
-        fetchedMutualsCount: 0, fetchedFollowsCount: 0
-    });
+    setNetworkVerifications({ mutualsVerifiedMe: [], followsVerifiedMe: [], mutualsVerifiedAnyone: 0, followsVerifiedAnyone: 0, fetchedMutualsCount: 0, fetchedFollowsCount: 0 });
     setNetworkStatusMessage("Fetching network lists (mutuals, follows)...");
 
     const publicAgent = new Agent({ service: 'https://public.api.bsky.app' });
 
     try {
-      // Fetch follows (public) and known followers/mutuals (authenticated)
       const [follows, mutuals] = await Promise.all([
-        // Use direct agent method (even for public agent)
-        fetchAllPaginated(publicAgent, publicAgent.getFollows.bind(publicAgent), { actor: session.did, limit: 100 }),
-        // Use direct agent method
+        fetchAllPaginated(publicAgent, publicAgent.api.app.bsky.graph.getFollows.bind(publicAgent.api.app.bsky.graph), { actor: session.did, limit: 100 }),
         fetchAllPaginated(agent, agent.getKnownFollowers.bind(agent), { actor: session.did, limit: 100 })
       ]);
 
-      console.log(`Fetched ${follows.length} follows (public), ${mutuals.length} mutuals (authenticated).`); // Updated log
-      setNetworkStatusMessage(`Fetched ${follows.length} follows, ${mutuals.length} mutuals. Discovering PDS and checking verifications...`);
-
-      // Update fetched counts
-      setNetworkVerifications(prev => ({
-        ...prev,
-        fetchedMutualsCount: mutuals.length,
-        fetchedFollowsCount: follows.length,
-      }));
+      console.log(`Fetched ${follows.length} follows, ${mutuals.length} mutuals.`);
+      setNetworkStatusMessage(`Fetched ${follows.length} follows, ${mutuals.length} mutuals. Checking verifications...`);
+      setNetworkVerifications(prev => ({ ...prev, fetchedMutualsCount: mutuals.length, fetchedFollowsCount: follows.length }));
 
       const followsSet = new Set(follows.map(f => f.did));
       const mutualsSet = new Set(mutuals.map(m => m.did));
-
       const allProfilesMap = new Map();
-      [...follows, ...mutuals].forEach(user => {
-          if (!allProfilesMap.has(user.did)) {
-              allProfilesMap.set(user.did, user);
-          }
-      });
-
+      [...follows, ...mutuals].forEach(user => { if (!allProfilesMap.has(user.did)) allProfilesMap.set(user.did, user); });
       const uniqueUserDids = Array.from(allProfilesMap.keys());
 
       if (uniqueUserDids.length === 0) {
-        setNetworkStatusMessage("No mutuals or follows found to check.");
+        setNetworkStatusMessage("No mutuals or follows found.");
         setIsLoadingNetwork(false);
         setNetworkChecked(true);
         return;
       }
 
-      let results = {
-        mutualsVerifiedMe: [], followsVerifiedMe: [],
-        mutualsVerifiedAnyone: 0, followsVerifiedAnyone: 0
-      };
-
-      const batchSize = 5;
+      let results = { mutualsVerifiedMe: [], followsVerifiedMe: [], mutualsVerifiedAnyone: 0, followsVerifiedAnyone: 0 };
+      const batchSize = 10;
       for (let i = 0; i < uniqueUserDids.length; i += batchSize) {
         const batchDids = uniqueUserDids.slice(i, i + batchSize);
         setNetworkStatusMessage(`Checking network... (${i + batchDids.length}/${uniqueUserDids.length})`);
@@ -332,38 +259,35 @@ function Verifier() {
         await Promise.all(batchDids.map(async (did) => {
           const profile = allProfilesMap.get(did);
           if (!profile) return;
-
           const isMutual = mutualsSet.has(did);
           const isFollow = followsSet.has(did);
-
           const pdsEndpoint = await getPdsEndpoint(did);
-          if (!pdsEndpoint) {
-              console.warn(`Skipping verification check for ${profile.handle} (no PDS found).`);
-              return;
-          }
+          if (!pdsEndpoint) return;
 
           let foundVerificationForMe = null;
           let hasVerifiedAnyone = false;
           let listRecordsCursor = undefined;
+          const tempPublicAgent = new Agent({ service: pdsEndpoint });
 
           do {
             try {
-              const listParams = new URLSearchParams({ repo: did, collection: 'app.bsky.graph.verification', limit: '100' });
-              if (listRecordsCursor) listParams.set('cursor', listRecordsCursor);
-              const listRecordsUrl = `${pdsEndpoint}/xrpc/com.atproto.repo.listRecords?${listParams.toString()}`;
-              const listResponse = await fetch(listRecordsUrl);
-              if (!listResponse.ok) { break; }
-              const listData = await listResponse.json();
-              const records = listData.records || [];
+              const response = await tempPublicAgent.listRecords({
+                 repo: did,
+                 collection: 'app.bsky.graph.verification',
+                 limit: 100,
+                 cursor: listRecordsCursor
+              });
+              const records = response.data.records || [];
               if (records.length > 0) {
-                  hasVerifiedAnyone = true;
-                  const matchingRecord = records.find(record => record.value?.subject === session.did); // Use session.did
-                  if (matchingRecord) { foundVerificationForMe = matchingRecord; break; }
+                hasVerifiedAnyone = true;
+                const matchingRecord = records.find(record => record.value?.subject === session.did);
+                if (matchingRecord) { foundVerificationForMe = matchingRecord; break; }
               }
-              listRecordsCursor = listData.cursor;
+              listRecordsCursor = response.data.cursor;
             } catch (err) {
-                console.error(`Network error fetching listRecords for ${did} from ${pdsEndpoint}:`, err);
-                listRecordsCursor = undefined;
+              console.warn(`Could not listRecords for ${did} on ${pdsEndpoint}:`, err.message);
+              listRecordsCursor = undefined;
+              break;
             }
           } while (listRecordsCursor);
 
@@ -372,182 +296,129 @@ function Verifier() {
             if (isFollow) results.followsVerifiedAnyone++;
           }
           if (foundVerificationForMe) {
-              const accountInfo = { ...profile, verification: foundVerificationForMe };
-              if (isMutual) results.mutualsVerifiedMe.push(accountInfo);
-              if (isFollow) results.followsVerifiedMe.push(accountInfo);
+            const accountInfo = { ...profile, verification: foundVerificationForMe };
+            if (isMutual) results.mutualsVerifiedMe.push(accountInfo);
+            if (isFollow) results.followsVerifiedMe.push(accountInfo);
           }
-
         }));
-
-        setNetworkVerifications(prev => ({
-          ...prev,
-          mutualsVerifiedMe: [...results.mutualsVerifiedMe],
-          followsVerifiedMe: [...results.followsVerifiedMe],
-          mutualsVerifiedAnyone: results.mutualsVerifiedAnyone,
-          followsVerifiedAnyone: results.followsVerifiedAnyone,
-        }));
+        setNetworkVerifications(prev => ({ ...prev, ...results }));
       }
-
-      console.log('Network check complete. Results:', results);
       setNetworkStatusMessage("Network verification check complete.");
-
     } catch (error) {
-      // Catch errors from initial Promise.all or other setup issues
-      console.error('Fatal error during network verification check:', error);
-      setStatusMessage(`Fatal error checking network: ${error.message || 'Unknown error'}`);
+      console.error('Error during network verification check:', error);
+      setStatusMessage(`Error checking network: ${error.message || 'Unknown error'}`);
       setNetworkStatusMessage("");
     } finally {
       setIsLoadingNetwork(false);
       setNetworkChecked(true);
     }
-  };
+  }, [agent, session, userInfo]);
 
-  // Call fetchVerifications when agent is available
   useEffect(() => {
     if (agent) {
       fetchVerifications();
     }
-  }, [agent]);
+  }, [agent, fetchVerifications]);
 
-  // Updated function to check each official verifier individually
-  const checkOfficialVerification = async () => {
-    if (!agent || !session) return;
-
-    // Initialize status for all verifiers to 'checking'
+  const checkOfficialVerification = useCallback(async () => {
+    if (!session?.did) return;
     const initialStatuses = {};
     TRUSTED_VERIFIERS.forEach(id => { initialStatuses[id] = 'checking'; });
     setOfficialVerifiersStatus(initialStatuses);
-
     const publicAgent = new Agent({ service: 'https://public.api.bsky.app' });
 
-    // Use Promise.all to run checks concurrently (optional, but can be faster)
     await Promise.all(TRUSTED_VERIFIERS.map(async (verifierIdentifier) => {
       let verifierDid = null;
       let verifierHandle = verifierIdentifier;
-      let currentStatus = 'checking'; // Status for this specific verifier
-
+      let currentStatus = 'checking';
       try {
-        // Resolve handle/DID
         if (!verifierIdentifier.startsWith('did:')) {
           const resolveResult = await publicAgent.resolveHandle({ handle: verifierIdentifier });
           verifierDid = resolveResult.data.did;
         } else {
           verifierDid = verifierIdentifier;
           try {
-             const profileRes = await publicAgent.getProfile({ actor: verifierDid });
-             verifierHandle = profileRes.data.handle;
-          } catch (profileError) { /* ignore */ }
+            const profileRes = await publicAgent.api.app.bsky.actor.getProfile({ actor: verifierDid });
+            verifierHandle = profileRes.data.handle;
+          } catch { /* ignore */ }
         }
         if (!verifierDid) throw new Error('Could not resolve identifier');
-
-        // Discover PDS
         const pdsEndpoint = await getPdsEndpoint(verifierDid);
         if (!pdsEndpoint) throw new Error('Could not find PDS');
 
-        // Paginate through their listRecords
         let listRecordsCursor = undefined;
         let foundMatch = false;
+        const tempPublicAgent = new Agent({ service: pdsEndpoint });
+
         do {
-          const listParams = new URLSearchParams({ repo: verifierDid, collection: 'app.bsky.graph.verification', limit: '100' });
-          if (listRecordsCursor) listParams.set('cursor', listRecordsCursor);
-          const listRecordsUrl = `${pdsEndpoint}/xrpc/com.atproto.repo.listRecords?${listParams.toString()}`;
-          const listResponse = await fetch(listRecordsUrl);
-
-          if (!listResponse.ok) {
-             // Treat 400 (repo/collection not found) as simply not verified by this one
-             if (listResponse.status !== 400) {
-                console.warn(`Failed fetch for ${verifierHandle}: ${listResponse.status}`);
-                throw new Error(`Fetch failed with status ${listResponse.status}`); // Throw for other errors
-             }
-             break; // Stop checking this verifier on 400 or other errors
+          try {
+            const response = await tempPublicAgent.listRecords({
+               repo: verifierDid,
+               collection: 'app.bsky.graph.verification',
+               limit: 100,
+               cursor: listRecordsCursor
+            });
+            const records = response.data.records || [];
+            const matchingRecord = records.find(record => record.value?.subject === session.did);
+            if (matchingRecord) {
+              currentStatus = 'verified';
+              foundMatch = true;
+              break;
+            }
+            listRecordsCursor = response.data.cursor;
+          } catch (err) {
+             console.warn(`Could not listRecords for ${verifierDid} on ${pdsEndpoint}:`, err.message);
+             listRecordsCursor = undefined;
+             break;
           }
-
-          const listData = await listResponse.json();
-          const records = listData.records || [];
-          const matchingRecord = records.find(record => record.value?.subject === session.did); // Use session.did
-
-          if (matchingRecord) {
-            console.log(`Found official verification by ${verifierHandle}`);
-            currentStatus = 'verified';
-            foundMatch = true;
-            break; // Exit pagination loop for THIS verifier
-          }
-          listRecordsCursor = listData.cursor;
         } while (listRecordsCursor);
-
-        // If loop completed without finding a match for this verifier
-        if (!foundMatch) {
+        if (!foundMatch && currentStatus === 'checking') {
             currentStatus = 'not_verified';
         }
-
       } catch (error) {
         console.error(`Error checking official verifier ${verifierIdentifier}:`, error);
-        currentStatus = 'error'; // Set status to error for this specific verifier
+        currentStatus = 'error';
       }
-
-      // Update the state for this specific verifier
       setOfficialVerifiersStatus(prev => ({ ...prev, [verifierIdentifier]: currentStatus }));
-
-    })); // End Promise.all map
-
+    }));
     console.log("Finished checking all official verifiers.");
+  }, [session]);
 
-  }; // End checkOfficialVerification
-
-  // Effect to check official verification status on load
   useEffect(() => {
-    // Run check when agent/session are ready
-    if (agent && session?.did) { // Changed from session.sub
+    if (session?.did) {
       checkOfficialVerification();
     }
-    // Run once when agent/session become available
-  }, [agent, session]);
+  }, [session, checkOfficialVerification]);
 
-  // --- Fetch Autocomplete Suggestions --- (Keep as is)
   const fetchSuggestions = useCallback(async (query) => {
-    if (!query || query.trim().length < 2) { // Minimum 2 chars to search
+    if (!query || query.trim().length < 2) {
       setSuggestions([]);
-      // Don't explicitly setShowSuggestions(false) here, let onChange handle it
       return;
     }
-
     setIsFetchingSuggestions(true);
-    // Don't set showSuggestions(true) here either, should be true already if we got here
-
     try {
-      const url = new URL('https://public.api.bsky.app/xrpc/app.bsky.actor.searchActorsTypeahead');
-      url.searchParams.append('q', query);
-      url.searchParams.append('limit', '5'); // Fetch 5 suggestions
-
-      const response = await fetch(url.toString());
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      console.log('Suggestions fetched:', data.actors);
-      setSuggestions(data.actors || []);
+      const publicAgent = new Agent({ service: 'https://public.api.bsky.app' });
+      const response = await publicAgent.api.app.bsky.actor.searchActorsTypeahead({
+         q: query,
+         limit: 5
+      });
+      setSuggestions(response.data.actors || []);
     } catch (error) {
       console.error('Failed to fetch suggestions:', error);
-      setSuggestions([]); // Clear suggestions on error
+      setSuggestions([]);
     } finally {
       setIsFetchingSuggestions(false);
     }
   }, []);
 
-  // Effect to fetch suggestions based on debounced search term AND if suggestions should be shown
   useEffect(() => {
-    // Only fetch if the user is likely typing (suggestions are meant to be shown)
-    // and the term is long enough.
     if (debouncedSearchTerm && showSuggestions) {
       fetchSuggestions(debouncedSearchTerm);
-    } else if (!debouncedSearchTerm) { // Always clear if term is empty
+    } else if (!debouncedSearchTerm) {
       setSuggestions([]);
-      // setShowSuggestions(false); // Let onChange handle hiding when empty
     }
-    // If showSuggestions is false (e.g., after a click), this effect won't trigger a fetch.
-  }, [debouncedSearchTerm, fetchSuggestions, showSuggestions]); // Add showSuggestions dependency
+  }, [debouncedSearchTerm, fetchSuggestions, showSuggestions]);
 
-  // --- Click Outside Handler for Suggestions --- (Keep as is)
   useEffect(() => {
     function handleClickOutside(event) {
       if (suggestionsRef.current && !suggestionsRef.current.contains(event.target) &&
@@ -555,83 +426,42 @@ function Verifier() {
         setShowSuggestions(false);
       }
     }
-    // Bind the event listener
     document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      // Unbind the event listener on clean up
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [suggestionsRef, inputRef]); // Add inputRef dependency
-  // --- End Click Outside Handler ---
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [suggestionsRef, inputRef]);
 
-  // --- handleVerify --- (Keep as is)
   const handleVerify = async (e) => {
     e.preventDefault();
-    if (!agent || !session) {
-      setStatusMessage('Error: Not logged in or agent not initialized.');
-      return;
-    }
-    if (!targetHandle) {
-      setStatusMessage('Please enter a handle to verify.');
-      return;
-    }
+    if (!agent || !session) return;
+    if (!targetHandle) return;
     setIsVerifying(true);
     setStatusMessage(`Verifying ${targetHandle}...`);
-    setShowSuggestions(false); // Hide suggestions when submitting
-
+    setShowSuggestions(false);
     try {
-      // 1. Get profile of targetHandle (resolve handle to DID and get display name)
-      setStatusMessage(`Fetching profile for ${targetHandle}...`);
-      // Use the proper API namespace method
       const profileRes = await agent.getProfile({ actor: targetHandle });
       const targetDid = profileRes.data.did;
       const targetDisplayName = profileRes.data.displayName || profileRes.data.handle;
-      console.log('Target Profile:', profileRes.data);
-
-      // 2. Construct the verification record object
       const verificationRecord = {
-        $type: 'app.bsky.graph.verification', // Using the type you provided
+        $type: 'app.bsky.graph.verification',
         subject: targetDid,
-        handle: targetHandle, // Include handle for context
-        displayName: targetDisplayName, // Include display name
+        handle: targetHandle,
+        displayName: targetDisplayName,
         createdAt: new Date().toISOString(),
       };
-      console.log('Verification Record to Create:', verificationRecord);
-
-      // 3. Create the record using the agent's com.atproto.repo.createRecord method
-      setStatusMessage(`Creating verification record for ${targetHandle} on your profile...`);
-
-      // The correct method is repo.createRecord, not createRecord
-      const createRes = await agent.createRecord({
-        repo: session.did, // Use session.did
-        collection: 'app.bsky.graph.verification', // The NSID of the record type
+      await agent.createRecord({
+        repo: session.did,
+        collection: 'app.bsky.graph.verification',
         record: verificationRecord,
       });
-
-      console.log('Create Record Response:', createRes);
-
-      // --- Construct Success Message with Intent Link --- (Keep as is)
-      const verifiedHandle = targetHandle; // Capture handle for this success
-      const postText = `I just verified @${verifiedHandle} using Bluesky's new decentralized verification system. Try verifying someone yourself using @cred.blue's new verification tool: https://cred.blue/verify`;
+      const postText = `I just verified @${targetHandle} using Bluesky's new decentralized verification system. Try verifying someone yourself using @cred.blue's new verification tool: https://cred.blue/verify`;
       const encodedText = encodeURIComponent(postText);
       const intentUrl = `https://bsky.app/intent/compose?text=${encodedText}`;
-
       const successMessageJSX = (
-        <>
-          Successfully created verification record for {verifiedHandle}!{' '}
-          <a href={intentUrl} target="_blank" rel="noopener noreferrer" className="verifier-intent-link"> {/* Use plain class */} 
-            Post on Bluesky to let them know.
-          </a>
-        </>
+        <>Successfully created verification for {targetHandle}! <a href={intentUrl} target="_blank" rel="noopener noreferrer" className="verifier-intent-link">Post on Bluesky?</a></>
       );
-      setStatusMessage(successMessageJSX); // Set JSX as status message
-      // --- End Intent Link Construction ---
-
-      setTargetHandle(''); // Clear input on success
-
-      // Refresh the list of verifications
+      setStatusMessage(successMessageJSX);
+      setTargetHandle('');
       fetchVerifications();
-
     } catch (error) {
       console.error('Verification failed:', error);
       setStatusMessage(`Verification failed: ${error.message || 'Unknown error'}`);
@@ -639,34 +469,20 @@ function Verifier() {
       setIsVerifying(false);
     }
   };
-  // --- End handleVerify ---
 
-  // Function to revoke (delete) a verification - (Keep as is)
   const handleRevoke = async (verification) => {
-    if (!agent || !session) {
-      setStatusMessage('Error: Not logged in or agent not initialized.');
-      return;
-    }
-
+    if (!agent || !session) return;
     setIsRevoking(true);
     setStatusMessage(`Revoking verification for ${verification.handle}...`);
-
     try {
-      // Extract rkey from URI
-      // URI format: at://did:plc:xxx/app.bsky.graph.verification/rkey
       const parts = verification.uri.split('/');
       const rkey = parts[parts.length - 1];
-
       await agent.deleteRecord({
-        repo: session.did, // Use session.did
+        repo: session.did,
         collection: 'app.bsky.graph.verification',
         rkey: rkey
       });
-
-      console.log('Revoked verification for:', verification.handle);
       setStatusMessage(`Successfully revoked verification for ${verification.handle}`);
-
-      // Refresh the list of verifications
       fetchVerifications();
     } catch (error) {
       console.error('Revocation failed:', error);
@@ -676,41 +492,22 @@ function Verifier() {
     }
   };
 
-  // --- handleSuggestionClick --- (Keep as is)
   const handleSuggestionClick = (handle) => {
     setTargetHandle(handle);
     setSuggestions([]);
     setShowSuggestions(false);
-    inputRef.current?.focus(); // Keep focus on input after selection
+    inputRef.current?.focus();
   };
-  // --- End handleSuggestionClick ---
 
-  // AuthProvider handles redirection if not logged in during its initial load
-  if (isAuthLoading) {
-    return <p>Loading authentication...</p>;
-  }
-
-  if (authError) {
-    return <p>Authentication Error: {authError}. <a href="/login">Please login</a>.</p>;
-  }
-
-  // Display message if session is not available but not loading/erroring
+  if (isAuthLoading) return <p>Loading authentication...</p>;
+  if (authError) return <p>Authentication Error: {authError}. <a href="/login">Please login</a>.</p>;
   if (!session && !isAuthLoading && !authError) {
-     return (
-        <div className="verifier-container">
-           <h1>Bluesky Verifier Tool</h1>
-           <p>Please <a href="/login">login with Bluesky</a> to use the verifier tool.</p>
-        </div>
-     );
+     return (<div className="verifier-container"><h1>Bluesky Verifier Tool</h1><p>Please <a href="/login">login with Bluesky</a> to use the verifier tool.</p></div>);
   }
 
-  // Update combined loading state
   const isAnyOperationInProgress = isVerifying || isRevoking || isLoadingVerifications || isLoadingNetwork || isCheckingValidity;
-
-  // Update tooltip construction to use the (potentially resolved) handles
   const trustedVerifiersTooltip = `Checking if any of these Trusted Verifiers have created a verification record for your DID: ${TRUSTED_VERIFIERS.join(', ')}.`;
 
-  // Use standard class names, not styles object
   return (
     <div className="verifier-container">
       <h1>Bluesky Verifier Tool</h1>
@@ -718,72 +515,44 @@ function Verifier() {
         With Bluesky's new decentralized verification system, anyone can verify anyone else and any Bluesky client can choose which accounts to treat as "Trusted Verifiers". It's a first-of-its-kind verification system for a mainstream social platform of this size. Try verifying an account for yourself or check to see who has verified you!
       </p>
       <div className="verifier-page-header">
-        <p className="verifier-user-info">Logged in as: {userInfo ? `${userInfo.displayName} (@${userInfo.handle})` : session?.did}</p> {/* Safely access session.did */} 
-        <button
-          onClick={signOut}
-          disabled={isAnyOperationInProgress}
-          className="verifier-sign-out-button"
-        >
-          Sign Out
-        </button>
+        <p className="verifier-user-info">Logged in as: {userInfo ? `${userInfo.displayName} (@${userInfo.handle})` : session?.did}</p>
+        <button onClick={signOut} disabled={isAnyOperationInProgress} className="verifier-sign-out-button">Sign Out</button>
       </div>
       <hr />
 
-      {/* Verification form */}
       <div className="verifier-section">
         <h2>Verify a Bluesky User</h2>
         <p>Enter the handle of the user you want to verify (e.g., targetuser.bsky.social):</p>
-        {/* --- Input Container for Autocomplete Positioning --- */}
         <div className="verifier-input-container">
           <form onSubmit={handleVerify} className="verifier-form-container" style={{ marginBottom: 0 }}>
             <input
-              ref={inputRef} // Assign ref
+              ref={inputRef}
               type="text"
               value={targetHandle}
               onChange={(e) => {
                 const newValue = e.target.value;
                 setTargetHandle(newValue);
-                if (newValue.length >= 2) {
-                    setShowSuggestions(true);
-                } else {
-                    setShowSuggestions(false);
-                    setSuggestions([]);
-                }
+                setShowSuggestions(newValue.length >= 2);
+                if(newValue.length < 2) setSuggestions([]);
               }}
-              onFocus={() => {
-                 if (targetHandle.length >= 2) {
-                    setShowSuggestions(true);
-                 }
-              }}
+              onFocus={() => { if (targetHandle.length >= 2) setShowSuggestions(true); }}
               placeholder="targetuser.bsky.social"
               disabled={isAnyOperationInProgress}
               required
               className="verifier-input-field"
               autoComplete="off"
             />
-            <button
-              type="submit"
-              disabled={isVerifying || isRevoking || isLoadingVerifications || isLoadingNetwork || isCheckingValidity}
-              className="verifier-submit-button"
-            >
+            <button type="submit" disabled={isVerifying || !targetHandle} className="verifier-submit-button">
               {isVerifying ? 'Verifying...' : 'Create Verification Record'}
             </button>
           </form>
-          {/* --- Suggestions Dropdown --- */}
           {showSuggestions && (suggestions.length > 0 || isFetchingSuggestions) && (
             <ul className="verifier-suggestions-list" ref={suggestionsRef}>
               {isFetchingSuggestions && suggestions.length === 0 ? (
                  <li className="verifier-suggestion-item">Loading...</li>
               ) : (
                 suggestions.map((actor) => (
-                  <li
-                    key={actor.did}
-                    className="verifier-suggestion-item"
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      handleSuggestionClick(actor.handle);
-                    }}
-                  >
+                  <li key={actor.did} className="verifier-suggestion-item" onMouseDown={(e) => { e.preventDefault(); handleSuggestionClick(actor.handle); }}>
                     <img src={actor.avatar} alt="" className="verifier-suggestion-avatar" />
                     <div className="verifier-suggestion-text">
                       <span className="verifier-suggestion-display-name">{actor.displayName || actor.handle}</span>
@@ -800,224 +569,91 @@ function Verifier() {
         </div>
       </div>
 
-      {/* Global Status message */}
       {statusMessage && (
-        <div className={`
-          verifier-status-box
-          ${ typeof statusMessage === 'string' && (statusMessage.includes('failed') || statusMessage.includes('Error'))
-              ? 'verifier-status-box-error'
-              : 'verifier-status-box-success'
-          }
-        `}>
+        <div className={`verifier-status-box ${typeof statusMessage === 'string' && (statusMessage.includes('failed') || statusMessage.includes('Error')) ? 'verifier-status-box-error' : 'verifier-status-box-success'}`}>
           <p>{statusMessage}</p>
         </div>
       )}
 
-      {/* Updated Official Verifiers section */}
       <div className="verifier-section">
          <div style={{display: 'flex', alignItems: 'center', marginBottom: '10px'}}>
           <h2 style={{ display: 'inline-block', marginRight: '8px', marginBottom: 0, border: 'none', padding: 0 }}>Your Verification Status</h2>
-          <span
-            title={trustedVerifiersTooltip}
-            className="verifier-official-verifier-tooltip"
-            style={{ fontSize: '1.2em' }}
-          >
-            (?)
-          </span>
+          <span title={trustedVerifiersTooltip} className="verifier-official-verifier-tooltip" style={{ fontSize: '1.2em' }}>(?)</span>
         </div>
-
-        {/* Map over trusted verifiers and display individual status */}
         <div>
           {TRUSTED_VERIFIERS.map(verifierId => {
             const status = officialVerifiersStatus[verifierId] || 'idle';
-            let message = '...';
-            let icon = '⏳';
-            let statusClass = '';
-
+            let message = '...'; let icon = '⏳'; let statusClass = 'verifier-idle-status';
             switch (status) {
-              case 'checking':
-                message = `Checking ${verifierId}...`;
-                icon = '⏳';
-                statusClass = 'verifier-checking-status';
-                break;
-              case 'verified':
-                message = `Verified by ${verifierId}.`;
-                icon = '✅';
-                statusClass = 'verifier-verified-status';
-                break;
-              case 'not_verified':
-                message = `Not verified by ${verifierId}.`;
-                icon = '❌';
-                statusClass = 'verifier-not-verified-status';
-                break;
-              case 'error':
-                message = `Error checking ${verifierId}.`;
-                icon = '⚠️';
-                statusClass = 'verifier-error-status';
-                break;
-              default: // idle
-                message = `Pending check for ${verifierId}.`;
-                icon = '⏳';
-                 statusClass = 'verifier-idle-status';
+              case 'checking': message = `Checking ${verifierId}...`; icon = '⏳'; statusClass = 'verifier-checking-status'; break;
+              case 'verified': message = `Verified by ${verifierId}.`; icon = '✅'; statusClass = 'verifier-verified-status'; break;
+              case 'not_verified': message = `Not verified by ${verifierId}.`; icon = '❌'; statusClass = 'verifier-not-verified-status'; break;
+              case 'error': message = `Error checking ${verifierId}.`; icon = '⚠️'; statusClass = 'verifier-error-status'; break;
+              default: message = `Pending check for ${verifierId}.`;
             }
-
-            return (
-              <p key={verifierId} className={`verifier-official-verifier-note ${statusClass}`}>
-                {icon} {message}
-              </p>
-            );
+            return (<p key={verifierId} className={`verifier-official-verifier-note ${statusClass}`}>{icon} {message}</p>);
           })}
         </div>
       </div>
 
-      {/* Updated section for Network Verifications */}
       <div className="verifier-section">
         <div className="verifier-list-header">
           <h2>Who's Verified You?</h2>
-          <button
-            onClick={checkNetworkVerifications}
-            disabled={isAnyOperationInProgress}
-            className="verifier-action-button verifier-check-network-button"
-          >
+          <button onClick={checkNetworkVerifications} disabled={isAnyOperationInProgress} className="verifier-action-button verifier-check-network-button">
             {isLoadingNetwork ? 'Checking Network...' : 'Check Network Now'}
           </button>
         </div>
-
-        {/* Display local status message */}
-        {(isLoadingNetwork || networkStatusMessage) && (
-          <p className="verifier-network-status">{networkStatusMessage}</p>
-        )}
-
+        {(isLoadingNetwork || networkStatusMessage) && (<p className="verifier-network-status">{networkStatusMessage}</p>)}
         {!isLoadingNetwork && networkChecked && (
           <div className="verifier-network-results">
-            {/* --- Mutuals Verified Me --- */}
-            <p>
-              {networkVerifications.mutualsVerifiedMe.length > 0
-                ? `${networkVerifications.mutualsVerifiedMe.length} mutual(s) have verified you:`
-                : "None of your mutuals have verified you yet."}
-            </p>
-            {networkVerifications.mutualsVerifiedMe.length > 0 && (
-              <ul className="verifier-verifier-list">
-                {networkVerifications.mutualsVerifiedMe.map(account => (
-                  <li key={account.did}>
-                    {account.displayName} (@{account.handle})
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {/* --- Follows Verified Me --- */}
-            <p style={{marginTop: '15px'}}>
-              {networkVerifications.followsVerifiedMe.length > 0
-                ? `${networkVerifications.followsVerifiedMe.length} account(s) you follow have verified you:`
-                : "None of the accounts you follow have verified you yet."}
-            </p>
-             {networkVerifications.followsVerifiedMe.length > 0 && (
-              <ul className="verifier-verifier-list">
-                {networkVerifications.followsVerifiedMe.map(account => (
-                  <li key={account.did}>
-                     {account.displayName} (@{account.handle})
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {/* --- Additional Context - Verified Others --- */}
+            <p>{networkVerifications.mutualsVerifiedMe.length > 0 ? `${networkVerifications.mutualsVerifiedMe.length} mutual(s) have verified you:` : "None of your mutuals have verified you yet."}</p>
+            {networkVerifications.mutualsVerifiedMe.length > 0 && (<ul className="verifier-verifier-list">{networkVerifications.mutualsVerifiedMe.map(account => (<li key={account.did}>{account.displayName} (@{account.handle})</li>))}</ul>)}
+            <p style={{marginTop: '15px'}}>{networkVerifications.followsVerifiedMe.length > 0 ? `${networkVerifications.followsVerifiedMe.length} account(s) you follow have verified you:` : "None of the accounts you follow have verified you yet."}</p>
+            {networkVerifications.followsVerifiedMe.length > 0 && (<ul className="verifier-verifier-list">{networkVerifications.followsVerifiedMe.map(account => (<li key={account.did}>{account.displayName} (@{account.handle})</li>))}</ul>)}
             <div className="verifier-additional-context">
-                 <p>
-                   {networkVerifications.mutualsVerifiedAnyone} of your {networkVerifications.fetchedMutualsCount} fetched mutuals have verified others.
-                </p>
-                <p>
-                   {networkVerifications.followsVerifiedAnyone} of the {networkVerifications.fetchedFollowsCount} accounts you follow have verified others.
-                </p>
+                 <p>{networkVerifications.mutualsVerifiedAnyone} of your {networkVerifications.fetchedMutualsCount} fetched mutuals have verified others.</p>
+                 <p>{networkVerifications.followsVerifiedAnyone} of the {networkVerifications.fetchedFollowsCount} accounts you follow have verified others.</p>
             </div>
+            {(() => {
+              const statsText = `My verification stats:
 
-            {/* --- Network Stats Share Link --- */}
-            {(() => { // IIFE to encapsulate logic
-              const statsText = `Here are my expanded verification stats:\n\n` +
-                                `${networkVerifications.mutualsVerifiedMe.length} of my mutuals have verified me\n` +
-                                `${networkVerifications.followsVerifiedMe.length} account(s) that I follow have verified me\n` +
-                                `${networkVerifications.mutualsVerifiedAnyone} of my ${networkVerifications.fetchedMutualsCount} mutuals have verified others\n` +
-                                `${networkVerifications.followsVerifiedAnyone} of the ${networkVerifications.fetchedFollowsCount} accounts I follow have verified others\n\n` +
-                                `See who in your network has verified you here: https://cred.blue/verify`;
+${networkVerifications.mutualsVerifiedMe.length} mutuals verified me
+${networkVerifications.followsVerifiedMe.length} follows verified me
+${networkVerifications.mutualsVerifiedAnyone}/${networkVerifications.fetchedMutualsCount} mutuals verified others
+${networkVerifications.followsVerifiedAnyone}/${networkVerifications.fetchedFollowsCount} follows verified others
+
+Check yours: https://cred.blue/verify`;
               const encodedStatsText = encodeURIComponent(statsText);
               const statsIntentUrl = `https://bsky.app/intent/compose?text=${encodedStatsText}`;
-
-              return (
-                <a
-                  href={statsIntentUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="verifier-share-stats-link"
-                >
-                  Share your verification stats on Bluesky!
-                </a>
-              );
+              return (<a href={statsIntentUrl} target="_blank" rel="noopener noreferrer" className="verifier-share-stats-link">Share your stats!</a>);
             })()}
-
           </div>
         )}
-        {!isLoadingNetwork && !networkChecked && (
-           <p>Click "Check Network Now" to see verifications from your network.</p>
-        )}
+        {!isLoadingNetwork && !networkChecked && (<p>Click "Check Network Now" to see verifications from your network.</p>)}
       </div>
 
-      {/* List of verified accounts */}
       <div className="verifier-section">
         <div className="verifier-list-header">
           <h2>Accounts You've Verified</h2>
-          <button
-            onClick={() => fetchVerifications()}
-            disabled={isAnyOperationInProgress}
-            className="verifier-action-button verifier-refresh-button"
-          >
-            Refresh List
-          </button>
+          <button onClick={fetchVerifications} disabled={isAnyOperationInProgress} className="verifier-action-button verifier-refresh-button">Refresh List</button>
         </div>
-        {isLoadingVerifications ? (
-          <p>Loading verifications...</p>
-        ) : verifications.length === 0 ? (
-          <p>You haven't verified any accounts yet.</p>
-        ) : (
+        {isLoadingVerifications ? (<p>Loading...</p>) : verifications.length === 0 ? (<p>You haven't verified any accounts.</p>) : (
           <ul className="verifier-list">
             {verifications.map((verification) => (
-              <li
-                key={verification.uri}
-                className={`
-                  verifier-list-item
-                  ${verification.validityChecked && !verification.isValid ? 'verifier-list-item-invalid' : ''}
-                `}
-              >
+              <li key={verification.uri} className={`verifier-list-item ${verification.validityChecked && !verification.isValid ? 'verifier-list-item-invalid' : ''}`}>
                 <div className="verifier-list-item-content">
                   <div style={{ fontWeight: 'bold' }}>{verification.displayName}</div>
                   <div className="verifier-list-item-handle">@{verification.handle}</div>
-                  <div className="verifier-list-item-date">
-                    Verified: {new Date(verification.createdAt).toLocaleString()}
-                  </div>
-
+                  <div className="verifier-list-item-date">Verified: {new Date(verification.createdAt).toLocaleString()}</div>
                   {verification.validityChecked && !verification.isValid && (
                     <div className="verifier-validity-warning">
-                      {verification.validityError ? (
-                        <p>⚠️ Could not verify current profile data</p>
-                      ) : (
-                        <>
-                          <p><strong>⚠️ Profile has changed since verification</strong></p>
-                          <p>
-                            <span>Current handle: @{verification.currentHandle}</span><br />
-                            <span>Current display name: {verification.currentDisplayName}</span>
-                          </p>
-                        </>
-                      )}
+                      {verification.validityError ? (<p>⚠️ Couldn't check profile</p>) : (<><p><strong>⚠️ Profile changed</strong></p><p><span>Now: @{verification.currentHandle}</span><br /><span>Name: {verification.currentDisplayName}</span></p></>)}
                     </div>
                   )}
                 </div>
                 <div className="verifier-list-item-actions">
-                  <button
-                    onClick={() => handleRevoke(verification)}
-                    disabled={isAnyOperationInProgress}
-                    className="verifier-revoke-button"
-                  >
-                    {isRevoking ? 'Revoking...' : 'Revoke Verification'}
+                  <button onClick={() => handleRevoke(verification)} disabled={isRevoking || isLoadingVerifications} className="verifier-revoke-button">
+                    {isRevoking ? 'Revoking...' : 'Revoke'}
                   </button>
                 </div>
               </li>

@@ -45,7 +45,6 @@ export const AuthProvider = ({ children }) => {
         // Create the client instance
         const oauthClient = new BrowserOAuthClient({
           clientMetadata: clientMetadata,
-          handleResolver: 'https://bsky.social'
         });
 
         setClient(oauthClient); // Store the client instance

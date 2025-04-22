@@ -26,13 +26,7 @@
 
 /* Apply consistent styles ONLY to h2 elements within verifier sections */
 .verifier-section h2 {
-  color: var(--button-bg);
-  font-size: 1.5em;
-  text-align: left;
   margin-top: 0;
-  margin-bottom: 15px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--card-border);
 }
 
 .verifier-page-header {
@@ -343,22 +337,6 @@
   margin-top: 15px;
   font-size: 0.9em;
   font-weight: bold;
-}
-
-/* Official Verifier Status */
-/*
-.verifier-official-verifier-tooltip {
-  ...
-}
-*/
-
-/* Add Style for Description Paragraph */
-.verifier-section-description {
-  font-size: 0.9em;
-  color: var(--text-muted, #6c757d);
-  margin-top: -5px; /* Adjust to position nicely below header */
-  margin-bottom: 15px; /* Space before the list */
-  text-align: left;
 }
 
 .verifier-official-verifier-note {

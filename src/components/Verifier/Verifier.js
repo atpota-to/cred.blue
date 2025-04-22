@@ -738,7 +738,7 @@ function Verifier() {
         <div className="verifier-list-header">
           <h2>Verifications from Your Network</h2>
           <button onClick={checkNetworkVerifications} disabled={isAnyOperationInProgress} className="verifier-action-button verifier-check-network-button">
-            {isLoadingNetwork ? 'Checking Network...' : 'Check Network Now'}
+            {isLoadingNetwork ? 'Checking Network...' : 'Check Network'}
           </button>
         </div>
         {(isLoadingNetwork || networkStatusMessage) && (<p className="verifier-network-status">{networkStatusMessage}</p>)}
@@ -767,7 +767,6 @@ Check yours: https://cred.blue/verify`;
             })()}
           </div>
         )}
-        {!isLoadingNetwork && !networkChecked && (<p>Click "Check Network Now" to see verifications from your network.</p>)}
       </div>
 
       <div className="verifier-section">

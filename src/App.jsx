@@ -19,8 +19,6 @@ import UserProfile from './components/UserProfile/UserProfile';
 import ZenPage from './components/ZenPage';
 import CompareScores from './components/CompareScores/CompareScores';
 import CollectionsFeed from './components/CollectionsFeed/CollectionsFeed';
-import AdminRoute from './components/Admin/AdminRoute';
-import ProtectedRoute from './components/ProtectedRoute';
 import Login from './components/Login/Login';
 import LoginCallback from './components/Login/LoginCallback';
 import { AuthProvider } from './contexts/AuthContext';
@@ -56,22 +54,14 @@ const App = () => {
                 <Route path="/zen" element={<ZenPage />} />
                 <Route path="/methodology" element={<ScoringMethodology />} />
                 
-                {/* Protected Routes - Require Authentication */}
-                <Route 
-                  path="/omnifeed/:username" 
-                  element={
-                    <ProtectedRoute>
-                      <CollectionsFeed />
-                    </ProtectedRoute>
-                  } 
+                {/* Omnifeed Routes - Now Public */}
+                <Route
+                  path="/omnifeed/:username"
+                  element={<CollectionsFeed />}
                 />
-                <Route 
-                  path="/omnifeed" 
-                  element={
-                    <ProtectedRoute>
-                      <CollectionsFeed />
-                    </ProtectedRoute>
-                  } 
+                <Route
+                  path="/omnifeed"
+                  element={<CollectionsFeed />}
                 />
                 
                 {/* Handle both DIDs and regular usernames */}

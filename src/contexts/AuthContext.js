@@ -30,460 +30,108 @@ export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const lastAuthCheck = useRef(0);
-  const authCheckInProgress = useRef(false);
-  const didInitialCheck = useRef(false);
+  const initializing = useRef(false);
 
-  // Initialize the OAuth client
+  // Updated initializeAuth for BrowserOAuthClient
   useEffect(() => {
     const initializeAuth = async () => {
-      if (didInitialCheck.current) return;
-      didInitialCheck.current = true;
-      
+      if (initializing.current || client) return; // Prevent multiple initializations
+      initializing.current = true;
+      setLoading(true);
+      setError(null);
+      console.log('(AuthProvider) Initializing BrowserOAuthClient...');
+
       try {
-        // First check server-side authentication status
-        console.log('Checking server authentication status');
-        const serverAuthResponse = await fetch('/api/auth/status', {
-          credentials: 'include'
-        });
-        
-        if (!serverAuthResponse.ok) {
-          console.error('Server auth check failed with status:', serverAuthResponse.status);
-        } else {
-          const serverAuthData = await serverAuthResponse.json();
-          console.log('Server auth status:', serverAuthData);
-          
-          if (serverAuthData.isAuthenticated || serverAuthData.authenticated) {
-            console.log('Already authenticated on server, setting session');
-            setSession(serverAuthData.user);
-            setLoading(false);
-            return;
-          }
-        }
-
-        // If not authenticated on the server, check client OAuth
-        console.log('Not authenticated on server, initializing OAuth client');
+        // Create the client instance
         const oauthClient = new BrowserOAuthClient({
-          clientMetadata,
-          handleResolver: 'https://bsky.social',
+          clientMetadata: clientMetadata,
+          handleResolver: 'https://bsky.social', // Use Bluesky's resolver or your own
         });
 
-        try {
-          // Initialize the client and check for existing sessions
-          const result = await oauthClient.init();
-          console.log('OAuth client initialized:', oauthClient);
-          setClient(oauthClient);
-          
-          if (result?.session) {
-            console.log('Found existing OAuth session:', result.session);
-            
-            // Check if atproto_session exists in localStorage as a backup
-            const atprotoSession = localStorage.getItem('atproto_session');
-            console.log('atproto_session in localStorage:', atprotoSession ? 'exists' : 'not found');
-            
-            // Try to extract handle from session
-            let handle = result.session.handle;
-            
-            // If handle is missing, try to extract it from other sources
-            if (!handle) {
-              try {
-                // Try server login data
-                if (result.session.server && result.session.server.login && result.session.server.login.handle) {
-                  handle = result.session.server.login.handle;
-                } 
-                // Try atproto_session in localStorage if it exists
-                else if (atprotoSession) {
-                  try {
-                    const parsedSession = JSON.parse(atprotoSession);
-                    if (parsedSession && parsedSession.handle) {
-                      handle = parsedSession.handle;
-                    }
-                  } catch (e) {
-                    console.error('Error parsing atproto_session:', e);
-                  }
-                }
-              } catch (e) {
-                console.error('Error extracting handle:', e);
-              }
-            }
-            
-            // Format session data for our internal use and sync with server
-            const sessionData = {
-              did: result.session.sub,
-              handle: handle || 'unknown' // Ensure we always have a handle value
-            };
-            
-            console.log('Syncing session with server:', sessionData);
-            
-            // Try to sync with server
-            try {
-              const syncResponse = await fetch('/api/sync-session', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(sessionData),
-                credentials: 'include'
-              });
-              
-              if (syncResponse.ok) {
-                const syncData = await syncResponse.json();
-                console.log('Initial session sync successful:', syncData);
-                setSession(syncData.user);
-              } else {
-                console.warn('Initial session sync failed:', await syncResponse.text());
-                
-                // If sync fails, extract what we can from the result.session
-                const handle = result.session.handle;
-                
-                // Try to get the handle from other properties if undefined
-                let fallbackHandle = handle;
-                if (!fallbackHandle) {
-                  // Check if we can extract handle from other properties
-                  try {
-                    // If we have additional properties in the session that might contain the handle
-                    if (result.session.server && result.session.server.login && result.session.server.login.handle) {
-                      fallbackHandle = result.session.server.login.handle;
-                    } else if (result.session.displayName && result.session.displayName.includes('@')) {
-                      // Sometimes displayName has the handle
-                      fallbackHandle = result.session.displayName.replace('@', '');
-                    } else {
-                      // Fallback to 'unknown' if we can't find a handle
-                      fallbackHandle = 'unknown';
-                    }
-                  } catch (e) {
-                    console.error('Error extracting handle from session:', e);
-                    fallbackHandle = 'unknown';
-                  }
-                }
-                
-                // Log what we're doing
-                console.log(`Using client session as fallback with handle: ${fallbackHandle}`);
-                
-                // Use client session in our internal format
-                setSession({
-                  did: result.session.sub,
-                  handle: fallbackHandle,
-                  displayName: result.session.displayName || fallbackHandle
-                });
-              }
-            } catch (syncError) {
-              console.error('Error syncing initial session:', syncError);
-              
-              // Extract handle with fallbacks similar to above
-              const handle = result.session.handle;
-              let fallbackHandle = handle;
-              
-              if (!fallbackHandle) {
-                try {
-                  if (result.session.server && result.session.server.login && result.session.server.login.handle) {
-                    fallbackHandle = result.session.server.login.handle;
-                  } else if (result.session.displayName && result.session.displayName.includes('@')) {
-                    fallbackHandle = result.session.displayName.replace('@', '');
-                  } else {
-                    fallbackHandle = 'unknown';
-                  }
-                } catch (e) {
-                  console.error('Error extracting handle from session:', e);
-                  fallbackHandle = 'unknown';
-                }
-              }
-              
-              console.log(`Using client session after error with handle: ${fallbackHandle}`);
-              
-              // If sync fails, still use client session in our internal format
-              setSession({
-                did: result.session.sub,
-                handle: fallbackHandle,
-                displayName: result.session.displayName || fallbackHandle
-              });
-            }
-          } else {
-            console.log('No existing OAuth session found');
+        setClient(oauthClient); // Store the client instance
+
+        // Initialize the client - this handles callbacks and session restoration
+        const initResult = await oauthClient.init();
+
+        if (initResult?.session) {
+          setSession(initResult.session);
+          console.log(`(AuthProvider) Session ${initResult.state ? 'established via callback' : 'restored'}:`, initResult.session.did);
+          if (initResult.state) {
+            console.log('(AuthProvider) Original state from callback:', initResult.state);
+            // Optionally, redirect based on state if needed, e.g., using navigate
+            // const returnUrl = initResult.state.returnUrl || '/'; // Example state usage
+            // window.location.href = returnUrl; // Or use React Router navigate
           }
-          
-          // Listen for session deletion events
-          oauthClient.addEventListener('deleted', (event) => {
-            console.log('Session deletion event received:', event.data);
-            
-            // Get current session DID at the time of event
-            const currentSession = session;
-            const sessionDid = currentSession?.did || currentSession?.sub;
-            
-            if (event.data.did === sessionDid) {
-              console.log('Current session was deleted, logging out');
-              setSession(null);
-              
-              // Also logout from server
-              fetch('/api/logout', {
-                method: 'POST',
-                credentials: 'include'
-              }).catch(err => {
-                console.error('Error during server logout after deletion:', err);
-              });
-            }
-          });
-        } catch (oauthError) {
-          console.error('OAuth client initialization error:', oauthError);
+        } else {
+          setSession(null);
+          console.log('(AuthProvider) No active session found or callback processed.');
         }
-        
-        setLoading(false);
       } catch (err) {
-        console.error('Auth initialization error:', err);
-        setError(err.message);
+        console.error('(AuthProvider) Error initializing client or handling callback:', err);
+        setError('Initialization failed. Please try refreshing.');
+        setSession(null);
+      } finally {
         setLoading(false);
+        initializing.current = false;
+        console.log('(AuthProvider) Initialization complete.');
       }
     };
 
     initializeAuth();
-  }, []);
+  }, [client]); // Dependency on client ensures it runs only once after client is potentially set
 
-  // Initiate the login process
-  const login = async (handle, returnUrl) => {
-    if (!client) return;
-    
+  // Updated login function - uses client.signIn()
+  const login = useCallback(async (handle, returnUrl = '/') => {
+    if (!client) {
+      setError("Client not initialized.");
+      return;
+    }
+    console.log(`(AuthProvider) Initiating client-side login for handle: ${handle || 'none specified'}`);
     try {
-      // Save returnUrl to session storage if provided
-      if (returnUrl) {
-        sessionStorage.setItem('returnUrl', returnUrl);
-      }
-      
-      // Create state parameter with returnUrl
-      const state = returnUrl ? 
-        btoa(JSON.stringify({ returnUrl })) : 
-        undefined;
-      
-      // Pass state parameter to signIn method
-      await client.signIn(handle, { state });
-    } catch (err) {
-      console.error('Login failed:', err);
-      setError(err.message);
-    }
-  };
-
-  // Logout the user
-  const logout = async () => {
-    try {
-      console.log('Starting logout process');
-      
-      // First, try to logout from the server
-      try {
-        const response = await fetch('/api/logout', {
-          method: 'POST',
-          credentials: 'include'
-        });
-        
-        if (response.ok) {
-          console.log('Server logout successful');
-        } else {
-          console.warn('Server logout failed, continuing with client logout');
-        }
-      } catch (serverLogoutErr) {
-        console.error('Error during server logout:', serverLogoutErr);
-        // Continue with client-side logout even if server logout fails
-      }
-      
-      // Clear the session state immediately
-      setSession(null);
-      
-      // If we have a client, try to clear its session too
-      if (client) {
-        try {
-          console.log('Attempting to clear OAuth client session');
-          
-          // Clear OAuth-specific storage items
-          localStorage.removeItem('atproto_session');
-          localStorage.removeItem('atproto_state');
-          localStorage.removeItem('atproto_refresh_token');
-          
-          // Check if there are any other localStorage items with 'atproto' in the key
-          Object.keys(localStorage).forEach(key => {
-            if (key.includes('atproto')) {
-              console.log(`Removing localStorage item: ${key}`);
-              localStorage.removeItem(key);
-            }
-          });
-        } catch (clientErr) {
-          console.error('Error clearing client storage:', clientErr);
-        }
-      } else {
-        console.warn('No OAuth client available for logout');
-      }
-      
-      // Force a reload to ensure all state is cleared
-      console.log('Completing logout - reloading page');
-      window.location.href = '/';
-    } catch (err) {
-      console.error('Logout process error:', err);
-      // Still try to reload even if there are errors
-      window.location.href = '/';
-    }
-  };
-
-  // Check server-side authentication status with debounce
-  const checkAuthStatus = useCallback(async () => {
-    // Avoid concurrent auth checks
-    if (authCheckInProgress.current) {
-      return !!session;
-    }
-
-    // Rate limiting - prevent checks more frequently than every 3 seconds
-    const now = Date.now();
-    if (now - lastAuthCheck.current < 3000) {
-      return !!session; // Return current auth state if called too frequently
-    }
-
-    authCheckInProgress.current = true;
-    lastAuthCheck.current = now;
-
-    try {
-      console.log('Checking auth status...');
-      
-      const controller = new AbortController();
-      // Set a timeout for the fetch to prevent hanging requests
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
-      const response = await fetch('/api/auth/status', {
-        credentials: 'include',
-        signal: controller.signal
+      // The state can be used to pass information through the redirect, like the return URL
+      const stateData = JSON.stringify({ returnUrl });
+      // signIn redirects the browser, so code execution stops here if successful
+      await client.signIn(handle || 'https://bsky.social', { // Use handle or default PDS
+         state: stateData,
+         // prompt: 'none', // Uncomment for silent sign-in attempt
       });
-      
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        console.error('Auth status check failed with status:', response.status);
-        // If we get a server error, we should still rely on client-side session
-        // to prevent users from getting logged out due to temporary server issues
-        authCheckInProgress.current = false;
-        return !!session;
-      }
-      
-      const data = await response.json();
-      console.log('Auth status check response:', data);
-      
-      const isAuthenticated = data.isAuthenticated || data.authenticated;
-      
-      if (isAuthenticated && data.user) {
-        // If server session is different from current session, update it
-        const currentSessionJSON = session ? JSON.stringify(session) : '';
-        const newSessionJSON = JSON.stringify(data.user);
-        
-        if (currentSessionJSON !== newSessionJSON) {
-          console.log('Updating session from server data');
-          setSession(data.user);
-        }
-        
-        authCheckInProgress.current = false;
-        return true;
-      } else {
-        // If server says not authenticated but we have a client session,
-        // try to synchronize sessions
-        if (session && client) {
-          try {
-            console.log('Server says not authenticated but we have a client session, trying to sync');
-            
-            // Extract handle from current session
-            let handle = session.handle;
-            if (!handle) {
-              // If our session doesn't have a handle, try to extract from other properties
-              try {
-                if (session.displayName && typeof session.displayName === 'string') {
-                  // Sometimes the handle might be in the displayName
-                  handle = session.displayName.includes('@') ? 
-                    session.displayName.replace('@', '') : 
-                    session.displayName;
-                }
-              } catch (e) {
-                console.error('Error extracting handle from session:', e);
-              }
-            }
-            
-            // Format session data properly
-            const sessionData = {
-              did: session.did || session.sub,
-              handle: handle || 'unknown' // Always provide a handle value
-            };
-            
-            console.log('Syncing with data:', sessionData);
-            
-            // Add a timeout for sync request
-            const syncController = new AbortController();
-            const syncTimeoutId = setTimeout(() => syncController.abort(), 5000);
-            
-            try {
-              // Try to sync one more time
-              const syncResponse = await fetch('/api/sync-session', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(sessionData),
-                credentials: 'include',
-                signal: syncController.signal
-              });
-              
-              clearTimeout(syncTimeoutId);
-              
-              if (syncResponse.ok) {
-                console.log('Session sync successful during status check');
-                const syncData = await syncResponse.json();
-                setSession(syncData.user);
-                authCheckInProgress.current = false;
-                return true;
-              } else {
-                console.error('Sync response was not ok:', syncResponse.status);
-                // If server explicitly rejects our sync attempt, we should clear session
-                setSession(null);
-                authCheckInProgress.current = false;
-                return false;
-              }
-            } catch (syncFetchError) {
-              clearTimeout(syncTimeoutId);
-              console.error('Network error during sync request:', syncFetchError);
-              
-              // On network errors, we should keep the current session state to prevent
-              // users from being logged out due to temporary connectivity issues
-              authCheckInProgress.current = false;
-              return !!session;
-            }
-          } catch (syncError) {
-            console.error('Error in sync logic during status check:', syncError);
-            // If there's an error in our sync logic, keep current session
-            authCheckInProgress.current = false;
-            return !!session;
-          }
-        }
-        
-        // If all attempts failed and the server says we're not authenticated
-        console.log('Server says not authenticated, clearing session');
-        setSession(null);
-        authCheckInProgress.current = false;
-        return false;
-      }
     } catch (err) {
-      console.error('Error checking auth status:', err);
-      // For network errors, don't log out the user
-      if (err.name === 'AbortError') {
-        console.warn('Auth status check timed out');
-      } else if (err.name === 'TypeError' && err.message.includes('Network request failed')) {
-        console.warn('Network request failed during auth check - keeping current session state');
-      }
-      
-      authCheckInProgress.current = false;
-      return !!session; // Fall back to current session state on errors
+      // This catch might run if the user navigates back or cancels
+      console.error('(AuthProvider) Error during signIn initiation or cancellation:', err);
+      setError('Login initiation failed or was cancelled.');
     }
-  }, [session, client]);
+  }, [client]);
+
+  // Updated Logout function - uses session.signOut()
+  const logout = useCallback(async () => {
+     if (!session) return;
+     console.log('(AuthProvider) Logging out...');
+     try {
+        await session.signOut(); // Use session's signOut method
+        setSession(null);
+        // Optionally clear other app state here
+        console.log('(AuthProvider) Logout complete.');
+        // Redirect to home or login page
+        window.location.href = '/'; // Force reload to ensure clean state
+     } catch (err) {
+       console.error('(AuthProvider) Error during logout:', err);
+       // Still attempt to clear local session on error
+       setSession(null);
+       window.location.href = '/'; // Force reload
+     }
+  }, [session]);
 
   return (
-    <AuthContext.Provider 
-      value={{ 
-        session, 
-        loading, 
+    <AuthContext.Provider
+      value={{
+        client, // Export the client instance if needed by components (e.g., LoginCallback)
+        session,
+        loading, // Renamed from authLoading for clarity
         error,
         isAuthenticated: !!session,
-        login, 
+        login,
         logout,
-        checkAuthStatus 
+        // Remove checkAuthStatus export
       }}
     >
       {children}
@@ -497,5 +145,7 @@ export const useAuth = () => {
   if (context === null) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
+  // Ensure components using the hook get the updated context value
+  // (React handles this, but good to be mindful)
   return context;
 }; 

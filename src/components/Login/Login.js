@@ -1,111 +1,59 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import './Login.css';
 
 const Login = () => {
   const [handle, setHandle] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [returnUrl, setReturnUrl] = useState('');
-  const { login, isAuthenticated, loading } = useAuth();
+  const { login, loading, error, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const hasRedirected = useRef(false);
 
-  // Extract returnUrl from query params
+  const queryParams = new URLSearchParams(location.search);
+  const returnUrl = queryParams.get('returnUrl') || '/';
+
   useEffect(() => {
-    const searchParams = new URLSearchParams(location.search);
-    const returnPath = searchParams.get('returnUrl');
-    if (returnPath) {
-      setReturnUrl(returnPath);
-    }
-  }, [location]);
-
-  // Redirect if already authenticated
-  useEffect(() => {
-    // Skip redirection if loading is still true
-    if (loading) return;
-    
-    // Only redirect once to prevent loop
-    if (isAuthenticated && !hasRedirected.current) {
-      hasRedirected.current = true;
-      // Navigate to return URL if it exists, otherwise to home
-      navigate(returnUrl || '/');
-    }
-  }, [isAuthenticated, navigate, returnUrl, loading]);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    // Don't allow login attempt if already authenticated
     if (isAuthenticated) {
-      navigate(returnUrl || '/');
-      return;
+      console.log('Already authenticated, redirecting from Login page to:', returnUrl);
+      navigate(returnUrl);
     }
-    
-    if (!handle) {
-      setError('Please enter your Bluesky handle');
-      return;
-    }
-    
-    // Don't allow multiple concurrent login attempts
-    if (isLoading) return;
-    
-    setIsLoading(true);
-    setError('');
-    
-    try {
-      // Pass returnUrl to login function
-      await login(handle, returnUrl);
-      // Note: This code won't run because login redirects to Bluesky OAuth page
-    } catch (err) {
-      setError('Authentication failed. Please try again.');
-      setIsLoading(false);
-    }
+  }, [isAuthenticated, navigate, returnUrl]);
+
+  const handleInputChange = (event) => {
+    setHandle(event.target.value);
   };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    console.log(`Login attempt for handle: ${handle || 'default PDS'}, returnUrl: ${returnUrl}`);
+    await login(handle || null, returnUrl);
+  };
+
+  if (isAuthenticated) {
+    return <div>Redirecting...</div>;
+  }
 
   return (
     <div className="login-container">
-      <div className="login-card">
-        <h2>Login with Bluesky</h2>
-        <p>Sign in with your Bluesky handle to access protected features.</p>
-        
-        {returnUrl && (
-          <div className="return-notice">
-            <p>You'll be redirected back to the page you were trying to access after logging in.</p>
-          </div>
-        )}
-        
-        {error && <div className="login-error">{error}</div>}
-        
-        <form onSubmit={handleSubmit} className="login-form">
-          <input
-            id="handle"
-            type="text"
-            value={handle}
-            onChange={(e) => setHandle(e.target.value)}
-            placeholder="yourhandle.bsky.social"
-            disabled={isLoading || isAuthenticated}
-            autoFocus
-          />
-          
-          <button 
-            type="submit" 
-            className="login-button"
-            disabled={isLoading || isAuthenticated}
-          >
-            {isLoading ? 'Connecting...' : 'Login with Bluesky'}
-          </button>
-        </form>
-        
-        <div className="login-info">
-          <p>
-            We use Bluesky's authentication service to verify your identity.
-            No passwords are stored by cred.blue.
-          </p>
-        </div>
-      </div>
+      <h1>Login to Cred Blue</h1>
+      <p>Enter your Bluesky handle (e.g., yourname.bsky.social) or leave blank to use bsky.social.</p>
+      <form onSubmit={handleSubmit}>
+        <input
+          type="text"
+          value={handle}
+          onChange={handleInputChange}
+          placeholder="yourname.bsky.social (optional)"
+          aria-label="Bluesky Handle (optional)"
+        />
+        {loading && <p>Processing...</p>}
+        {error && <p className="error-message">Login failed: {error}</p>}
+        <button type="submit" disabled={loading}>
+          {loading ? 'Processing...' : 'Login with Bluesky'}
+        </button>
+      </form>
+      <p className="privacy-note">
+        We use official Bluesky authentication. We don't see or store your password.
+      </p>
     </div>
   );
 };

@@ -239,7 +239,6 @@
 
 /* Verification Lists */
 .verifier-list-header {
-  display: flex;
   justify-content: space-between; /* Align button to the right */
   align-items: center;
   margin-bottom: 10px; /* Space above list */
@@ -310,6 +309,7 @@
 .verifier-check-network-button {
   font-size: .9em;
   margin: 0px;
+  margin-top: 16.4px;
 }
 
 .verifier-action-button.verifier-refresh-button {
@@ -415,13 +415,13 @@
 /* Media Query for smaller screens */
 @media (max-width: 480px) {
   .verifier-tooltip-text {
-    max-width: 200px; /* Reduce max width */
-    left: 10px; /* Anchor more towards left */
-    transform: translateX(0); /* Reset transform centering */
+    max-width: 85vw; /* Limit width relative to viewport */
+    left: 50%; /* Keep centered relative to icon */
+    transform: translateX(-50%); /* Keep centering transform */
   }
   .verifier-tooltip-text::after {
-    left: 15px; /* Adjust arrow position */
-    transform: translateX(0);
+    left: 50%; /* Keep arrow centered */
+    transform: translateX(-50%); /* Keep centering transform */
   }
 }
 

@@ -714,7 +714,7 @@ function Verifier() {
 
       <div className="verifier-section">
          <div style={{display: 'flex', alignItems: 'center', marginBottom: '10px'}}>
-          <h2 style={{ display: 'inline-block', marginRight: '8px', marginBottom: 0, border: 'none', padding: 0 }}>Your Verification Status</h2>
+          <h2 style={{ display: 'inline-block', marginRight: '8px', marginBottom: 0, border: 'none', padding: 0 }}>Your Official Verifications</h2>
           <div className="verifier-tooltip-container">
             <span className="verifier-tooltip-icon">(?)</span>
             <span className="verifier-tooltip-text">
@@ -740,7 +740,7 @@ function Verifier() {
 
       <div className="verifier-section">
         <div className="verifier-list-header">
-          <h2>Who's Verified You?</h2>
+          <h2>Verifications from Your Network</h2>
           <button onClick={checkNetworkVerifications} disabled={isAnyOperationInProgress} className="verifier-action-button verifier-check-network-button">
             {isLoadingNetwork ? 'Checking Network...' : 'Check Network Now'}
           </button>
@@ -775,10 +775,6 @@ Check yours: https://cred.blue/verify`;
       </div>
 
       <div className="verifier-section">
-        <div className="verifier-list-header">
-          <h2>Accounts You've Verified</h2>
-          <button onClick={fetchVerifications} disabled={isAnyOperationInProgress} className="verifier-action-button verifier-refresh-button">Refresh List</button>
-        </div>
 
         {revokeStatusMessage && (
           <div className={`verifier-status-box ${revokeStatusMessage.includes('failed') ? 'verifier-status-box-error' : 'verifier-status-box-success'}`}>

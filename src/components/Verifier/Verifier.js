@@ -651,10 +651,12 @@ function Verifier() {
 
   return (
     <div className="verifier-container">
+      <div className="verifier-intro-container">
       <h1>Bluesky Verifier Tool</h1>
       <p className="verifier-intro-text">
         With Bluesky's new decentralized verification system, anyone can verify anyone else and any Bluesky client can choose which accounts to treat as "Trusted Verifiers". It's a first-of-its-kind verification system for a mainstream social platform of this size. Try verifying an account for yourself or check to see who has verified you!
       </p>
+      </div>
 
 
       <div className="verifier-section">

@@ -32,7 +32,7 @@
 .verifier-section p {
   color: var(--text);
   line-height: 1.6;
-  margin-bottom: 10px;
+  margin-bottom: 0px;
   text-align: left;
 }
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Agent } from '@atproto/api';
 import './Verifier.css';
@@ -134,6 +134,11 @@ function Verifier() {
   const [isCheckingValidity, setIsCheckingValidity] = useState(false);
   const [networkStatusMessage, setNetworkStatusMessage] = useState('');
   const [officialVerifiersStatus, setOfficialVerifiersStatus] = useState({});
+  const [suggestions, setSuggestions] = useState([]); // State for typeahead suggestions
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false); // State for suggestion loading indicator
+  const [showSuggestions, setShowSuggestions] = useState(false); // Control suggestion list visibility
+  const debounceTimeoutRef = useRef(null); // Ref for debounce timer
+  const suggestionListRef = useRef(null); // Ref for suggestion list to handle clicks outside
 
   useEffect(() => {
     if (session) {
@@ -565,11 +570,89 @@ function Verifier() {
     }
   };
 
+  // Debounced function to fetch typeahead suggestions
+  const fetchSuggestions = useCallback(async (query) => {
+    if (!query || query.length < 1) { // Minimum query length
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    setIsLoadingSuggestions(true);
+    setShowSuggestions(true); // Show list when fetching starts
+    try {
+      const url = `https://public.api.bsky.app/xrpc/app.bsky.actor.searchActorsTypeahead?q=${encodeURIComponent(query)}&limit=10`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status}`);
+      }
+      const data = await response.json();
+      setSuggestions(data.actors || []);
+    } catch (error) {
+      console.error("Failed to fetch suggestions:", error);
+      setSuggestions([]); // Clear suggestions on error
+    } finally {
+      setIsLoadingSuggestions(false);
+    }
+  }, []);
+
+  // Handler for input change with debouncing
+  const handleInputChange = (e) => {
+    const newHandle = e.target.value;
+    setTargetHandle(newHandle);
+
+    // Clear existing debounce timer
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+
+    if (newHandle.trim() === '') {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      setIsLoadingSuggestions(false);
+      return; // Don't fetch if input is empty
+    }
+
+    // Set new debounce timer
+    debounceTimeoutRef.current = setTimeout(() => {
+      fetchSuggestions(newHandle);
+    }, 300); // 300ms debounce delay
+  };
+
+  // Handler for clicking a suggestion
+  const handleSuggestionClick = (handle) => {
+    setTargetHandle(handle);
+    setSuggestions([]);
+    setShowSuggestions(false);
+  };
+
+  // Handler to hide suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (suggestionListRef.current && !suggestionListRef.current.contains(event.target)) {
+        // Check if the click target is the input field itself to avoid immediate closing
+        if (!event.target.classList.contains('verifier-input-field')) {
+            setShowSuggestions(false);
+        }
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Handler for input focus to potentially show suggestions again if needed
+  const handleInputFocus = () => {
+    if (targetHandle.trim() !== '' && suggestions.length > 0) {
+      setShowSuggestions(true);
+    }
+  };
+
   // Handle loading and error states
   if (isAuthLoading) return <p>Loading authentication...</p>;
   if (authError) return <p>Authentication Error: {authError}. <a href="/login">Please login</a>.</p>;
   
-  const isAnyOperationInProgress = isVerifying || isRevoking || isLoadingVerifications || isLoadingNetwork || isCheckingValidity;
+  const isAnyOperationInProgress = isVerifying || isRevoking || isLoadingVerifications || isLoadingNetwork || isCheckingValidity || isLoadingSuggestions;
 
   return (
     <div className="verifier-container">
@@ -590,13 +673,15 @@ function Verifier() {
       <div className="verifier-section">
         <h2>Verify a Bluesky User</h2>
         <p>Enter the handle of the user you want to verify:</p>
+        <div className="verifier-input-wrapper">
           <form onSubmit={handleVerify} className="verifier-form-container" style={{ marginBottom: 0 }}>
             <input
               type="text"
               value={targetHandle}
-              onChange={(e) => setTargetHandle(e.target.value)}
+              onChange={handleInputChange}
+              onFocus={handleInputFocus}
               placeholder="username.bsky.social"
-              disabled={isAnyOperationInProgress}
+              disabled={isVerifying || isRevoking || isLoadingVerifications || isLoadingNetwork || isCheckingValidity}
               required
               className="verifier-input-field"
               autoComplete="off"
@@ -605,6 +690,26 @@ function Verifier() {
               {isVerifying ? 'Verifying...' : 'Verify Account'}
             </button>
           </form>
+          {showSuggestions && (
+            <ul className="verifier-suggestions-list" ref={suggestionListRef}>
+              {isLoadingSuggestions ? (
+                <li className="verifier-suggestion-item loading">Loading suggestions...</li>
+              ) : suggestions.length > 0 ? (
+                 suggestions.map(actor => (
+                   <li key={actor.did} className="verifier-suggestion-item" onClick={() => handleSuggestionClick(actor.handle)}>
+                     <img src={actor.avatar} alt="" className="verifier-suggestion-avatar" onError={(e) => e.target.style.display = 'none'} />
+                     <div className="verifier-suggestion-text">
+                       <span className="verifier-suggestion-name">{actor.displayName || actor.handle}</span>
+                       <span className="verifier-suggestion-handle">@{actor.handle}</span>
+                     </div>
+                   </li>
+                 ))
+              ) : (
+                <li className="verifier-suggestion-item none">No users found.</li>
+              )}
+            </ul>
+          )}
+        </div>
       </div>
 
       {statusMessage && (

@@ -4,19 +4,20 @@ import { BrowserOAuthClient } from '@atproto/oauth-client-browser';
 // Create auth context
 export const AuthContext = createContext(null);
 
-// Set the appropriate domain based on the current hostname
-let domain = 'https://cred.blue';
+// Determine domain from environment variable or default
+const domain = process.env.REACT_APP_CRED_BLUE_DOMAIN || 'https://cred.blue';
+console.log(`(AuthProvider) Using domain: ${domain}`); // Log the domain being used
 
-// Always use the current domain for client_id to ensure it matches the host
-const metadataUrl = `https://cred.blue/client-metadata.json`;
+// Construct metadata URL based on the domain
+const metadataUrl = `${domain}/client-metadata.json`;
 
-// Client metadata for Bluesky OAuth
+// Client metadata for Bluesky OAuth - uses dynamic domain
 const clientMetadata = {
-  client_id: metadataUrl,
-  client_name: "Cred.blue",
-  client_uri: domain,
-  redirect_uris: [`https://cred.blue/login/callback`],
-  logo_uri: `https://cred.blue/favicon.ico`,
+  client_id: metadataUrl, // Use dynamically generated URL
+  client_name: "Cred.blue", // Keep name consistent or make dynamic if needed
+  client_uri: domain, // Use dynamic domain
+  redirect_uris: [`${domain}/login/callback`], // Use dynamic domain
+  logo_uri: `${domain}/favicon.ico`, // Use dynamic domain
   scope: "atproto transition:generic",
   grant_types: ["authorization_code", "refresh_token"],
   response_types: ["code"],
@@ -44,7 +45,7 @@ export const AuthProvider = ({ children }) => {
       try {
         // Create the client instance
         const oauthClient = new BrowserOAuthClient({
-          clientMetadata: clientMetadata,
+          clientMetadata: clientMetadata, // Pass the dynamically configured metadata
           handleResolver: 'https://public.api.bsky.app',
           plcDirectoryUrl: 'https://plc.directory',
         });

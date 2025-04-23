@@ -159,6 +159,8 @@ function Verifier() {
   // Verification options
   const [skipDuplicates, setSkipDuplicates] = useState(true);
 
+  const followsListUri = 'special:follows'; // Constant for the special URI
+
   useEffect(() => {
     if (session) {
       const agentInstance = new Agent(session);
@@ -449,9 +451,20 @@ function Verifier() {
             false // Not using direct fetch here
         );
         console.log(`Fetched ${lists.length} lists for user ${session.handle}`);
-        setUserLists(lists || []);
+        
+        // Prepend the special "Follows" list
+        const followsPseudoList = {
+            uri: 'special:follows',
+            name: 'My Follows',
+            // We don't fetch the count here for performance, handle display in component
+            listItemCount: null // Indicate count is unknown/dynamic
+        };
+
+        setUserLists([followsPseudoList, ...(lists || [])]); // Add follows list at the beginning
+
         if (lists.length === 0) {
-             setBulkVerifyStatus('You have not created any lists yet.');
+             // Adjust status message if only the pseudo-list exists
+             setBulkVerifyStatus('You have not created any custom lists yet.'); 
         } else {
              setBulkVerifyStatus(''); // Clear status on success if lists were found
         }
@@ -704,42 +717,79 @@ function Verifier() {
     }
 
     setIsVerifying(true);
-    setBulkVerifyStatus(`Fetching members of list: ${selectedList.name}...`);
+    setBulkVerifyStatus(`Fetching members of list: ${selectedList.name}...`); // Initial status
     setBulkVerifyProgress('');
     setStatusMessage(''); // Clear single verify status
     setRevokeStatusMessage(''); // Clear revoke status
 
+    // Initialize counters
     let successCount = 0;
     let failureCount = 0;
     let totalCount = 0;
-    const errors = [];
+    let errors = [];
     let skippedCount = 0; // Track skipped users
 
     try {
-        // Fetch all items from the selected list
-        const listItems = await fetchAllPaginated(
-            agent.api.app.bsky.graph, // The context object
-            'getList', // The method name as a string
-            { list: selectedListUri, limit: 100 },
-            false // Use agent method
-        );
+        let fetchedItems = [];
+        let sourceDescription = selectedList ? `list "${selectedList.name}"` : "the selected list";
+        if (selectedListUri === followsListUri) {
+            sourceDescription = "follows list";
+            setBulkVerifyStatus(`Fetching your follows...`);
+            fetchedItems = await fetchAllPaginated(
+                agent.api.app.bsky.graph,
+                'getFollows',
+                { actor: session.did, limit: 100 },
+                false
+            );
+             // The items are directly in the result array for getFollows
+        } else {
+             // Fetch items from a regular list
+            setBulkVerifyStatus(`Fetching members of list: ${selectedList.name}...`);
+            fetchedItems = await fetchAllPaginated(
+                agent.api.app.bsky.graph,
+                'getList',
+                { list: selectedListUri, limit: 100 },
+                false
+            );
+            // For getList, the users are within the 'subject' property of each item
+        }
 
-        totalCount = listItems.length;
-        setBulkVerifyStatus(`Found ${totalCount} members in list "${selectedList.name}". Starting verification...`);
+        totalCount = fetchedItems.length;
+        setBulkVerifyStatus(`Found ${totalCount} members in ${sourceDescription}. Starting verification...`);
 
         if (totalCount === 0) {
-            setBulkVerifyStatus(`List "${selectedList.name}" is empty. No users to verify.`);
+            setBulkVerifyStatus(`${sourceDescription} is empty. No users to verify.`);
             setIsVerifying(false);
             return;
         }
 
         // Iterate and verify each user
-        for (let i = 0; i < listItems.length; i++) {
-            const item = listItems[i];
-            const targetUser = item.subject;
-            const targetHandle = targetUser.handle;
-            const targetDid = targetUser.did;
-            const targetDisplayName = targetUser.displayName || targetHandle;
+        for (let i = 0; i < fetchedItems.length; i++) {
+            const item = fetchedItems[i];
+            let targetUser, targetHandle, targetDid, targetDisplayName;
+
+            // Extract user details based on source
+            if (selectedListUri === followsListUri) {
+                 // item is the user profile directly from getFollows result
+                 targetUser = item;
+                 targetDid = targetUser.did;
+                 targetHandle = targetUser.handle;
+                 targetDisplayName = targetUser.displayName || targetHandle;
+            } else {
+                 // item is from getList result, user is in item.subject
+                 targetUser = item.subject;
+                 targetDid = targetUser.did;
+                 targetHandle = targetUser.handle;
+                 targetDisplayName = targetUser.displayName || targetHandle;
+            }
+
+            // Check if essential details are present (safety check)
+             if (!targetDid || !targetHandle) {
+                 console.warn(`Skipping item at index ${i} due to missing DID or handle`, item);
+                 failureCount++;
+                 errors.push(`Item ${i + 1}: Missing DID or handle`);
+                 continue;
+             }
 
             setBulkVerifyProgress(`Verifying ${i + 1} of ${totalCount}: @${targetHandle}`);
 
@@ -775,7 +825,7 @@ function Verifier() {
         }
 
         // Final status message
-        let finalMessage = `Bulk verification complete for list "${selectedList.name}". \n`;
+        let finalMessage = `Bulk verification complete for ${sourceDescription}. \n`;
         finalMessage += `Successfully verified: ${successCount}. \n`;
         if (failureCount > 0) {
             finalMessage += `Failed: ${failureCount}. \n`;
@@ -813,8 +863,14 @@ function Verifier() {
         return;
     }
 
+    // Determine source description early for use in error messages
+    let sourceDescription = selectedList ? `list "${selectedList.name}"` : "the selected list";
+    if (selectedListUriForRevoke === followsListUri) {
+        sourceDescription = "follows list";
+    }
+
     // Confirmation dialog
-    if (!window.confirm(`Are you sure you want to revoke verifications for all users found in the list "${selectedList.name}"? This cannot be undone.`)) {
+    if (!window.confirm(`Are you sure you want to revoke verifications for all users found in ${sourceDescription}? This cannot be undone.`)) {
         return;
     }
 
@@ -826,24 +882,44 @@ function Verifier() {
     let successCount = 0;
     let failureCount = 0;
     let totalToRevoke = 0;
-    const errors = [];
+    let errors = [];
 
     try {
-        // Fetch all items from the selected list
-        const listItems = await fetchAllPaginated(
-            agent.api.app.bsky.graph,
-            'getList',
-            { list: selectedListUriForRevoke, limit: 100 },
-            false
-        );
+        let fetchedItems = [];
+        let listMemberDids = new Set();
+        // sourceDescription is already set above
 
-        if (listItems.length === 0) {
+        // Check if it's the special Follows list
+        if (selectedListUriForRevoke === followsListUri) {
+             // sourceDescription = "follows list"; // Already set
+             setBulkRevokeStatus(`Fetching your follows...`);
+             fetchedItems = await fetchAllPaginated(
+                 agent.api.app.bsky.graph,
+                 'getFollows',
+                 { actor: session.did, limit: 100 },
+                 false
+             );
+             // Extract DIDs directly from the follows list items
+             listMemberDids = new Set(fetchedItems.map(item => item.did));
+        } else {
+            // Fetch items from a regular list
+            setBulkRevokeStatus(`Fetching members of list: ${selectedList.name}...`);
+            fetchedItems = await fetchAllPaginated(
+                agent.api.app.bsky.graph,
+                'getList',
+                { list: selectedListUriForRevoke, limit: 100 },
+                false
+            );
+            // Extract DIDs from the subject of list items
+             listMemberDids = new Set(fetchedItems.map(item => item.subject.did));
+        }
+
+        if (fetchedItems.length === 0 && selectedListUriForRevoke !== followsListUri) {
+            // Only show empty message if it wasn't the follows list (or if follows *was* empty)
             setBulkRevokeStatus(`List "${selectedList.name}" is empty. No users to check for revocation.`);
             setIsRevoking(false);
             return;
         }
-
-        const listMemberDids = new Set(listItems.map(item => item.subject.did));
 
         // Filter existing verifications to find those matching list members
         const verificationsToRevoke = verifications.filter(verification =>
@@ -851,10 +927,10 @@ function Verifier() {
         );
 
         totalToRevoke = verificationsToRevoke.length;
-        setBulkRevokeStatus(`Found ${totalToRevoke} existing verification(s) matching users in "${selectedList.name}". Starting revocation...`);
+        setBulkRevokeStatus(`Found ${totalToRevoke} existing verification(s) matching users in ${sourceDescription}. Starting revocation...`);
 
         if (totalToRevoke === 0) {
-            setBulkRevokeStatus(`No existing verifications match users in the list "${selectedList.name}".`);
+            setBulkRevokeStatus(`No existing verifications match users in the ${sourceDescription}.`);
             setIsRevoking(false);
             return;
         }
@@ -883,7 +959,7 @@ function Verifier() {
         }
 
         // Final status message
-        let finalMessage = `Bulk revocation complete for list "${selectedList.name}". \n`;
+        let finalMessage = `Bulk revocation complete for ${sourceDescription}. \n`;
         finalMessage += `Successfully revoked: ${successCount}. \n`;
         if (failureCount > 0) {
             finalMessage += `Failed: ${failureCount}. \n`;
@@ -895,8 +971,8 @@ function Verifier() {
         setSelectedListUriForRevoke(''); // Reset selection
 
     } catch (error) {
-        console.error('Failed to fetch or process list items for revocation:', error);
-        setBulkRevokeStatus(`Error during bulk revocation for "${selectedList.name}": ${error.message || 'Unknown error'}`);
+        console.error('Failed to fetch or process items for revocation:', error);
+        setBulkRevokeStatus(`Error during bulk revocation for ${sourceDescription}: ${error.message || 'Unknown error'}`);
     } finally {
         setIsRevoking(false);
         setBulkRevokeProgress('');
@@ -987,7 +1063,7 @@ function Verifier() {
                     onChange={(e) => setSkipDuplicates(e.target.checked)}
                     disabled={isVerifying}
                 />
-                Skip Existing Verifications
+                Prevent Duplications
             </label>
         </div>
 

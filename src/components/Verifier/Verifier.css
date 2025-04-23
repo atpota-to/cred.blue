@@ -519,7 +519,6 @@
 .verifier-options {
     margin-top: 10px; /* Space above the options */
     margin-bottom: 15px; /* Space below the options */
-    padding-left: 5px; /* Slight indent */
 }
 
 .verifier-options label {
@@ -533,4 +532,5 @@
 
 .verifier-options input[type="checkbox"] {
     cursor: pointer;
+    margin: 0px;
 }

@@ -140,6 +140,14 @@ function Verifier() {
   const debounceTimeoutRef = useRef(null); // Ref for debounce timer
   const suggestionListRef = useRef(null); // Ref for suggestion list to handle clicks outside
 
+  // State for list verification
+  const [verifyMode, setVerifyMode] = useState('single'); // 'single' or 'list'
+  const [userLists, setUserLists] = useState([]);
+  const [selectedListUri, setSelectedListUri] = useState('');
+  const [isFetchingLists, setIsFetchingLists] = useState(false);
+  const [bulkVerifyStatus, setBulkVerifyStatus] = useState(''); // Status message for bulk operations
+  const [bulkVerifyProgress, setBulkVerifyProgress] = useState(''); // Progress indicator (e.g., "10/50")
+
   useEffect(() => {
     if (session) {
       const agentInstance = new Agent(session);
@@ -412,11 +420,48 @@ function Verifier() {
     }
   }, [agent, session, userInfo]);
 
+  // Function to fetch user's lists
+  const fetchUserLists = useCallback(async () => {
+    if (!agent || !session?.did) {
+        console.warn("fetchUserLists: Agent or session.did not available.");
+        return;
+    }
+    setIsFetchingLists(true);
+    setUserLists([]); // Clear previous lists
+    setStatusMessage(''); // Clear general status
+    setBulkVerifyStatus('Fetching your lists...'); // Use bulk status for list fetching message
+    try {
+        const lists = await fetchAllPaginated(
+            agent, // Pass the agent instance
+            agent.api.app.bsky.graph.getLists, // The method to call
+            { actor: session.did, limit: 100 }, // Initial parameters
+            false // Not using direct fetch here
+        );
+        console.log(`Fetched ${lists.length} lists for user ${session.handle}`);
+        setUserLists(lists || []);
+        if (lists.length === 0) {
+             setBulkVerifyStatus('You have not created any lists yet.');
+        } else {
+             setBulkVerifyStatus(''); // Clear status on success if lists were found
+        }
+    } catch (error) {
+        console.error('Failed to fetch user lists:', error);
+        setBulkVerifyStatus(`Failed to fetch lists: ${error.message || 'Unknown error'}`);
+    } finally {
+        setIsFetchingLists(false);
+        // Clear status if it was just 'Fetching...' and no error occurred but no lists found
+        if (!bulkVerifyStatus.includes('Failed') && !bulkVerifyStatus.includes('You have not created')) {
+            setBulkVerifyStatus('');
+        }
+    }
+  }, [agent, session]);
+
   useEffect(() => {
     if (agent) {
       fetchVerifications();
+      fetchUserLists(); // Fetch lists when agent is ready
     }
-  }, [agent, fetchVerifications]);
+  }, [agent, fetchVerifications, fetchUserLists]); // Add fetchUserLists dependency
 
   const checkOfficialVerification = useCallback(async () => {
     if (!session?.did) return;
@@ -625,6 +670,105 @@ function Verifier() {
     setShowSuggestions(false);
   };
 
+  // Handler for verifying a list
+  const handleVerifyList = async (e) => {
+    e.preventDefault();
+    if (!agent || !session || !selectedListUri) {
+        setStatusMessage('Please select a list to verify.');
+        return;
+    }
+
+    const selectedList = userLists.find(list => list.uri === selectedListUri);
+    if (!selectedList) {
+        setStatusMessage('Selected list not found.');
+        return;
+    }
+
+    setIsVerifying(true);
+    setBulkVerifyStatus(`Fetching members of list: ${selectedList.name}...`);
+    setBulkVerifyProgress('');
+    setStatusMessage(''); // Clear single verify status
+    setRevokeStatusMessage(''); // Clear revoke status
+
+    let successCount = 0;
+    let failureCount = 0;
+    let totalCount = 0;
+    const errors = [];
+
+    try {
+        // Fetch all items from the selected list
+        const listItems = await fetchAllPaginated(
+            agent,
+            agent.api.app.bsky.graph.getList,
+            { list: selectedListUri, limit: 100 },
+            false // Use agent method
+        );
+
+        totalCount = listItems.length;
+        setBulkVerifyStatus(`Found ${totalCount} members in list "${selectedList.name}". Starting verification...`);
+
+        if (totalCount === 0) {
+            setBulkVerifyStatus(`List "${selectedList.name}" is empty. No users to verify.`);
+            setIsVerifying(false);
+            return;
+        }
+
+        // Iterate and verify each user
+        for (let i = 0; i < listItems.length; i++) {
+            const item = listItems[i];
+            const targetUser = item.subject;
+            const targetHandle = targetUser.handle;
+            const targetDid = targetUser.did;
+            const targetDisplayName = targetUser.displayName || targetHandle;
+
+            setBulkVerifyProgress(`Verifying ${i + 1} of ${totalCount}: @${targetHandle}`);
+
+            try {
+                const verificationRecord = {
+                    $type: 'app.bsky.graph.verification',
+                    subject: targetDid,
+                    handle: targetHandle, // Store handle at time of verification
+                    displayName: targetDisplayName, // Store displayName at time of verification
+                    createdAt: new Date().toISOString(),
+                };
+
+                await agent.api.com.atproto.repo.createRecord({
+                    repo: session.did,
+                    collection: 'app.bsky.graph.verification',
+                    record: verificationRecord,
+                });
+                successCount++;
+            } catch (error) {
+                console.error(`Failed to verify @${targetHandle} (DID: ${targetDid}):`, error);
+                failureCount++;
+                errors.push(`@${targetHandle}: ${error.message || 'Unknown error'}`);
+                // Decide if you want to stop on first error or continue
+                // continue;
+            }
+        }
+
+        // Final status message
+        let finalMessage = `Bulk verification complete for list "${selectedList.name}". \n`;
+        finalMessage += `Successfully verified: ${successCount}. \n`;
+        if (failureCount > 0) {
+            finalMessage += `Failed: ${failureCount}. \n`;
+            // Consider showing detailed errors, maybe in console or a collapsible section
+            console.log("Bulk verification errors:", errors);
+            finalMessage += `Check console for details on failures.`;
+        }
+        setBulkVerifyStatus(finalMessage);
+        fetchVerifications(); // Refresh the list of verified accounts
+        setSelectedListUri(''); // Reset selection
+
+    } catch (error) {
+        console.error('Failed to fetch or process list items:', error);
+        setBulkVerifyStatus(`Error during bulk verification for "${selectedList.name}": ${error.message || 'Unknown error'}`);
+    } finally {
+        setIsVerifying(false);
+        setBulkVerifyProgress('');
+    }
+  };
+
   // Handler to hide suggestions when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -672,25 +816,77 @@ function Verifier() {
 
       <div className="verifier-section">
         <h2>Verify a Bluesky User</h2>
-        <p>Enter the handle of the user you want to verify:</p>
-        <div className="verifier-input-wrapper">
-          <form onSubmit={handleVerify} className="verifier-form-container" style={{ marginBottom: 0 }}>
+        <p>Enter the handle of the user you want to verify, or select a list to verify multiple users:</p>
+
+        {/* Mode Toggle */}
+        <div className="verifier-mode-toggle">
+          <label>
             <input
-              type="text"
-              value={targetHandle}
-              onChange={handleInputChange}
-              onFocus={handleInputFocus}
-              placeholder="username.bsky.social"
-              disabled={isVerifying || isRevoking || isLoadingVerifications || isLoadingNetwork || isCheckingValidity}
-              required
-              className="verifier-input-field"
-              autoComplete="off"
+              type="radio"
+              name="verifyMode"
+              value="single"
+              checked={verifyMode === 'single'}
+              onChange={() => setVerifyMode('single')}
+              disabled={isVerifying || isFetchingLists}
             />
-            <button type="submit" disabled={isVerifying || !targetHandle} className="verifier-submit-button">
-              {isVerifying ? 'Verifying...' : 'Verify Account'}
-            </button>
-          </form>
-          {showSuggestions && (
+            Verify Single User
+          </label>
+          <label>
+            <input
+              type="radio"
+              name="verifyMode"
+              value="list"
+              checked={verifyMode === 'list'}
+              onChange={() => setVerifyMode('list')}
+              disabled={isVerifying || isFetchingLists}
+            />
+            Verify List
+          </label>
+        </div>
+
+        {/* Conditional Input Area */}
+        <div className="verifier-input-wrapper">
+          {verifyMode === 'single' ? (
+            <form onSubmit={handleVerify} className="verifier-form-container" style={{ marginBottom: 0 }}>
+              <input
+                type="text"
+                value={targetHandle}
+                onChange={handleInputChange}
+                onFocus={handleInputFocus}
+                placeholder="username.bsky.social"
+                disabled={isVerifying || isRevoking || isLoadingVerifications || isLoadingNetwork || isCheckingValidity || isFetchingLists}
+                required
+                className="verifier-input-field"
+                autoComplete="off"
+              />
+              <button type="submit" disabled={isVerifying || !targetHandle} className="verifier-submit-button">
+                {isVerifying ? 'Verifying...' : 'Verify Account'}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleVerifyList} className="verifier-form-container" style={{ marginBottom: 0 }}>
+              <select
+                value={selectedListUri}
+                onChange={(e) => setSelectedListUri(e.target.value)}
+                disabled={isVerifying || isFetchingLists || userLists.length === 0}
+                required
+                className="verifier-list-select"
+              >
+                <option value="" disabled>{isFetchingLists ? "Loading lists..." : userLists.length === 0 ? "No lists found" : "-- Select a list --"}</option>
+                {userLists.map(list => (
+                  <option key={list.uri} value={list.uri}>
+                    {list.name} ({list.listItemCount || 0} members)
+                  </option>
+                ))}
+              </select>
+              <button type="submit" disabled={isVerifying || !selectedListUri || isFetchingLists} className="verifier-submit-button">
+                {isVerifying ? 'Verifying List...' : 'Verify Selected List'}
+              </button>
+            </form>
+          )}
+
+          {/* Suggestions only shown in single mode */}
+          {verifyMode === 'single' && showSuggestions && (
             <ul className="verifier-suggestions-list" ref={suggestionListRef}>
               {isLoadingSuggestions ? (
                 <li className="verifier-suggestion-item loading">Loading suggestions...</li>
@@ -712,9 +908,19 @@ function Verifier() {
         </div>
       </div>
 
-      {statusMessage && (
-        <div className={`verifier-status-box ${typeof statusMessage === 'string' && (statusMessage.includes('failed') || statusMessage.includes('Error')) ? 'verifier-status-box-error' : 'verifier-status-box-success'}`}>
-          <p>{statusMessage}</p>
+      {/* Combined Status Area */} 
+      {(statusMessage || bulkVerifyStatus || bulkVerifyProgress) && (
+        <div className={`verifier-status-box 
+          ${(statusMessage && (statusMessage.includes('failed') || statusMessage.includes('Error'))) || 
+            (bulkVerifyStatus && (bulkVerifyStatus.includes('failed') || bulkVerifyStatus.includes('Error'))) 
+            ? 'verifier-status-box-error' 
+            : 'verifier-status-box-success'}
+          ${bulkVerifyProgress ? ' verifier-status-box-progress' : ''}
+        `}>
+            {/* Show single status OR bulk status, prioritizing bulk status if active */}
+            {bulkVerifyStatus ? <p>{bulkVerifyStatus}</p> : statusMessage ? <p>{statusMessage}</p> : null}
+            {/* Show bulk progress if available */}
+            {bulkVerifyProgress && <p className="verifier-bulk-progress">{bulkVerifyProgress}</p>}
         </div>
       )}
 

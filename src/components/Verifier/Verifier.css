@@ -453,3 +453,63 @@
   text-overflow: ellipsis;
   overflow: hidden;
 }
+
+/* Styles for List Verification */
+.verifier-mode-toggle {
+  display: flex;
+  gap: 20px; /* Space between radio buttons */
+  margin-bottom: 15px; /* Space below the toggle */
+  padding-bottom: 15px; /* More space */
+  border-bottom: 1px solid var(--card-border); /* Separator line */
+}
+
+.verifier-mode-toggle label {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px; /* Space between radio and text */
+  color: var(--text);
+}
+
+.verifier-mode-toggle input[type="radio"] {
+  cursor: pointer;
+  /* Optional: style the radio button itself */
+}
+
+.verifier-list-select {
+  flex-grow: 1; /* Take available space */
+  border: 2px solid var(--card-border);
+  border-radius: 6px;
+  padding: 9px;
+  font-size: 1em;
+  background-color: var(--navbar-bg);
+  color: var(--text);
+  transition: all 0.3s ease;
+  font-family: inherit; /* Use main font */
+  min-width: 200px; /* Ensure minimum width */
+  margin: 0px;
+}
+
+.verifier-list-select:hover,
+.verifier-list-select:focus {
+  border-color: var(--button-bg);
+  background-color: var(--background); /* Match main app focus */
+  outline: none;
+}
+
+.verifier-list-select:disabled {
+  background-color: var(--button-disabled-bg, #cccccc);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.verifier-status-box-progress p {
+  margin-top: 5px; /* Space between main status and progress */
+  margin-bottom: 0;
+}
+
+.verifier-bulk-progress {
+  font-style: italic;
+  font-size: 0.9em;
+  color: var(--text-muted);
+}

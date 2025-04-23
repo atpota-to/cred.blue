@@ -390,17 +390,16 @@
 .verifier-suggestions-list {
   list-style: none;
   padding: 0;
-  margin: 5px 0 0 0;
+  margin: 10px 0px 0px 0px;
   position: absolute;
   top: 100%; /* Position below the input */
   left: 0;
   right: 0;
   background-color: var(--navbar-bg); /* Match nearby elements */
-  border: 1px solid var(--card-border);
-  border-top: none; /* Avoid double border with input */
-  border-radius: 0 0 6px 6px; /* Round bottom corners */
-  max-height: 250px; /* Limit height and allow scroll */
-  overflow-y: auto;
+  border: 2px solid var(--card-border);
+  border-radius: 6px; /* Round bottom corners */
+  max-height: 275px; /* Limit height and allow scroll */
+  overflow: clip;
   z-index: 1000; /* Ensure it appears above other content */
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
@@ -411,11 +410,6 @@
   padding: 10px 15px;
   cursor: pointer;
   transition: background-color 0.2s ease;
-}
-
-.verifier-suggestion-item:hover {
-  background-color: var(--button-hover-bg); /* Use button hover for consistency */
-  color: var(--button-text);
 }
 
 .verifier-suggestion-item.loading,
@@ -459,8 +453,3 @@
   text-overflow: ellipsis;
   overflow: hidden;
 }
-
-/* Adjust handle color on hover */
-.verifier-suggestion-item:hover .verifier-suggestion-handle {
-  color: var(--button-text); /* Match parent hover color */
-} 

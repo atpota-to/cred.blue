@@ -4,17 +4,12 @@ import { BrowserOAuthClient } from '@atproto/oauth-client-browser';
 // Create auth context
 export const AuthContext = createContext(null);
 
-// Set the appropriate domain based on the current hostname
-let domain = 'https://testing.cred.blue';
-
-// Always use the current domain for client_id to ensure it matches the host
-const metadataUrl = `https://testing.cred.blue/client-metadata.json`;
 
 // Client metadata for Bluesky OAuth
 const clientMetadata = {
-  client_id: metadataUrl,
+  client_id: `https://testing.cred.blue/client-metadata.json`,
   client_name: "cred.blue",
-  client_uri: domain,
+  client_uri: `https://testing.cred.blue`,
   redirect_uris: [`https://testing.cred.blue/login/callback`],
   logo_uri: `https://testing.cred.blue/favicon.ico`,
   scope: "atproto transition:generic",

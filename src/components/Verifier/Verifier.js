@@ -156,6 +156,9 @@ function Verifier() {
   const [bulkRevokeStatus, setBulkRevokeStatus] = useState(''); // Status message for bulk revoke
   const [bulkRevokeProgress, setBulkRevokeProgress] = useState(''); // Progress for bulk revoke
 
+  // Verification options
+  const [skipDuplicates, setSkipDuplicates] = useState(true);
+
   useEffect(() => {
     if (session) {
       const agentInstance = new Agent(session);
@@ -571,6 +574,14 @@ function Verifier() {
       const profileRes = await agent.api.app.bsky.actor.getProfile({ actor: targetHandle });
       const targetDid = profileRes.data.did;
       const targetDisplayName = profileRes.data.displayName || profileRes.data.handle;
+
+      // Check for duplicates if skipDuplicates is enabled
+      if (skipDuplicates && verifications.some(v => v.subject === targetDid)) {
+        setStatusMessage(`Verification for ${targetHandle} already exists. Skipped.`);
+        setIsVerifying(false);
+        return;
+      }
+
       const verificationRecord = {
         $type: 'app.bsky.graph.verification',
         subject: targetDid,
@@ -702,6 +713,7 @@ function Verifier() {
     let failureCount = 0;
     let totalCount = 0;
     const errors = [];
+    let skippedCount = 0; // Track skipped users
 
     try {
         // Fetch all items from the selected list
@@ -730,6 +742,13 @@ function Verifier() {
             const targetDisplayName = targetUser.displayName || targetHandle;
 
             setBulkVerifyProgress(`Verifying ${i + 1} of ${totalCount}: @${targetHandle}`);
+
+            // Check for duplicates if skipDuplicates is enabled
+            if (skipDuplicates && verifications.some(v => v.subject === targetDid)) {
+                setBulkVerifyProgress(`Skipping ${i + 1} of ${totalCount}: @${targetHandle} (already verified)`);
+                skippedCount++;
+                continue; // Move to the next user
+            }
 
             try {
                 const verificationRecord = {
@@ -763,6 +782,9 @@ function Verifier() {
             // Consider showing detailed errors, maybe in console or a collapsible section
             console.log("Bulk verification errors:", errors);
             finalMessage += `Check console for details on failures.`;
+        }
+        if (skippedCount > 0) { // Add skipped info
+            finalMessage += `Skipped (already verified): ${skippedCount}.`;
         }
         setBulkVerifyStatus(finalMessage);
         fetchVerifications(); // Refresh the list of verified accounts
@@ -954,6 +976,19 @@ function Verifier() {
             />
             Verify List
           </label>
+        </div>
+
+        {/* Verification Options */}
+        <div className="verifier-options">
+            <label>
+                <input
+                    type="checkbox"
+                    checked={skipDuplicates}
+                    onChange={(e) => setSkipDuplicates(e.target.checked)}
+                    disabled={isVerifying}
+                />
+                Skip Existing Verifications
+            </label>
         </div>
 
         {/* Conditional Input Area */}

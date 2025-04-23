@@ -459,6 +459,7 @@
   display: flex;
   gap: 20px; /* Space between radio buttons */
   margin-bottom: 15px; /* Space below the toggle */
+  margin-top: 15px;
   padding-bottom: 15px; /* More space */
   border-bottom: 1px solid var(--card-border); /* Separator line */
 }
@@ -512,4 +513,24 @@
   font-style: italic;
   font-size: 0.9em;
   color: var(--text-muted);
+}
+
+/* Styles for Verification Options (like Skip Duplicates checkbox) */
+.verifier-options {
+    margin-top: 10px; /* Space above the options */
+    margin-bottom: 15px; /* Space below the options */
+    padding-left: 5px; /* Slight indent */
+}
+
+.verifier-options label {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px; /* Space between checkbox and text */
+    color: var(--text);
+    font-size: 0.95em;
+}
+
+.verifier-options input[type="checkbox"] {
+    cursor: pointer;
 }

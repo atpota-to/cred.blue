@@ -200,6 +200,12 @@
   margin: 0;
 }
 
+.verifier-verifier-list {
+  margin: 0;
+  padding-left: 15px;
+  padding-top: 10px;
+}
+
 .verifier-list-item {
   display: flex;
   align-items: center;

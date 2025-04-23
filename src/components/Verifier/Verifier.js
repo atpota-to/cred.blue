@@ -1337,7 +1337,7 @@ function Verifier() {
       {/* Combined Status Area */} 
       {(statusMessage || bulkVerifyStatus || bulkVerifyProgress) && (
         <div className={`verifier-status-box 
-          ${(statusMessage && (statusMessage.includes('failed') || statusMessage.includes('Error'))) || 
+          ${(typeof statusMessage === 'string' && (statusMessage.includes('failed') || statusMessage.includes('Error'))) ||
             (bulkVerifyStatus && (bulkVerifyStatus.includes('failed') || bulkVerifyStatus.includes('Error'))) 
             ? 'verifier-status-box-error' 
             : 'verifier-status-box-success'}

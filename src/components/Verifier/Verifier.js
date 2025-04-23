@@ -13,12 +13,13 @@ const TRUSTED_VERIFIERS = [
 
 // Helper function modified to handle direct fetch or agent calls
 // Now accepts an optional 'useDirectFetch' flag and the direct URL if needed
-async function fetchAllPaginated(agentInstance, apiMethod, initialParams, useDirectFetch = false, directUrl = null) {
+// And accepts apiContext and methodName for correct 'this' binding
+async function fetchAllPaginated(apiContext, methodName, initialParams, useDirectFetch = false, directUrl = null) {
   let results = [];
   let cursor = initialParams.cursor;
   const params = { ...initialParams }; // Copy initial params
   // Determine operation name
-  const operationName = apiMethod ? (apiMethod.name.includes('bound ') ? apiMethod.name.split('bound ')[1].trim() : apiMethod.name) : (directUrl || 'directFetch');
+  const operationName = methodName || (directUrl || 'directFetch');
   console.log(`fetchAllPaginated: Starting ${operationName} with initialParams:`, initialParams);
 
   let currentUrl = directUrl; // Use direct URL if provided
@@ -42,19 +43,20 @@ async function fetchAllPaginated(agentInstance, apiMethod, initialParams, useDir
         const response = await fetch(url.toString());
         if (!response.ok) throw new Error(`HTTP error ${response.status}`);
         responseData = await response.json();
-      } else if (apiMethod) {
-        // Use agent method
+      } else if (apiContext && methodName) {
+        // Use agent method with correct context
         if (cursor) {
           params.cursor = cursor;
         }
-        const response = await apiMethod(params);
+        // Call the method using the provided context
+        const response = await apiContext[methodName](params);
         if (!response || !response.data) {
             console.warn(`fetchAllPaginated: Invalid agent response for ${operationName}`, response);
             break;
         }
         responseData = response.data;
       } else {
-         console.error("fetchAllPaginated: Called without agent method or direct URL");
+         console.error("fetchAllPaginated: Called without apiContext/methodName or direct URL");
          break;
       }
 
@@ -432,8 +434,8 @@ function Verifier() {
     setBulkVerifyStatus('Fetching your lists...'); // Use bulk status for list fetching message
     try {
         const lists = await fetchAllPaginated(
-            agent, // Pass the agent instance
-            agent.api.app.bsky.graph.getLists, // The method to call
+            agent.api.app.bsky.graph, // The context object
+            'getLists', // The method name as a string
             { actor: session.did, limit: 100 }, // Initial parameters
             false // Not using direct fetch here
         );
@@ -698,8 +700,8 @@ function Verifier() {
     try {
         // Fetch all items from the selected list
         const listItems = await fetchAllPaginated(
-            agent,
-            agent.api.app.bsky.graph.getList,
+            agent.api.app.bsky.graph, // The context object
+            'getList', // The method name as a string
             { list: selectedListUri, limit: 100 },
             false // Use agent method
         );

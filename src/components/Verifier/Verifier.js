@@ -940,7 +940,7 @@ function Verifier() {
     }
 
     setIsRevoking(true);
-    setBulkRevokeStatus(`Fetching members of list: ${selectedList.name}...`);
+    setBulkRevokeStatus(`Fetching members of ${sourceDescription}...`);
     setBulkRevokeProgress('');
     setRevokeStatusMessage(''); // Clear single revoke status
 
@@ -986,9 +986,23 @@ function Verifier() {
             return;
         }
 
-        // Filter existing verifications to find those matching list members
-        const verificationsToRevoke = verifications.filter(verification =>
-            listMemberDids.has(verification.subject)
+        // *** Fetch ALL existing verification records ***
+        setBulkRevokeStatus(`Fetching all your existing verification records...`);
+        const allVerificationRecords = await fetchAllPaginated(
+            agent.api.com.atproto.repo, // Context: repo API
+            'listRecords',             // Method: listRecords
+            {                          // Params:
+                repo: session.did,
+                collection: 'app.bsky.graph.verification',
+                limit: 100 // fetchAllPaginated handles pagination
+            },
+            false // Use agent method
+        );
+        console.log(`Fetched ${allVerificationRecords.length} total verification records.`);
+
+        // Filter the *complete* list of verifications to find those matching list members
+        const verificationsToRevoke = allVerificationRecords.filter(record =>
+            record.value?.subject && listMemberDids.has(record.value.subject)
         );
 
         totalToRevoke = verificationsToRevoke.length;
@@ -1002,12 +1016,13 @@ function Verifier() {
 
         // Iterate and revoke each matching verification
         for (let i = 0; i < verificationsToRevoke.length; i++) {
-            const verification = verificationsToRevoke[i];
-            const handle = verification.handle || verification.subject; // Use handle if available
+            const verificationRecord = verificationsToRevoke[i];
+            // Use handle from record value if available, fallback to subject DID
+            const handle = verificationRecord.value?.handle || verificationRecord.value?.subject || 'unknown'; 
             setBulkRevokeProgress(`Revoking ${i + 1} of ${totalToRevoke}: @${handle}`);
 
             try {
-                const parts = verification.uri.split('/');
+                const parts = verificationRecord.uri.split('/');
                 const rkey = parts[parts.length - 1];
 
                 await agent.api.com.atproto.repo.deleteRecord({
@@ -1017,7 +1032,7 @@ function Verifier() {
                 });
                 successCount++;
             } catch (error) {
-                console.error(`Failed to revoke @${handle} (URI: ${verification.uri}):`, error);
+                console.error(`Failed to revoke @${handle} (URI: ${verificationRecord.uri}):`, error);
                 failureCount++;
                 errors.push(`@${handle}: ${error.message || 'Unknown error'}`);
             }
@@ -1032,7 +1047,7 @@ function Verifier() {
             finalMessage += `Check console for details on failures.`;
         }
         setBulkRevokeStatus(finalMessage);
-        fetchVerifications(); // Refresh the list of verified accounts
+        fetchVerifications(); // Refresh the list of verified accounts displayed in UI
         setSelectedListUriForRevoke(''); // Reset selection
 
     } catch (error) {
@@ -1046,8 +1061,8 @@ function Verifier() {
 
   // Handler for revoking by time range
   const handleRevokeByTime = async () => {
-    if (!agent || !session || !revokeTimeRange || verifications.length === 0) {
-        setBulkRevokeStatus('Cannot revoke by time: Missing agent, session, time range, or no verifications found.');
+    if (!agent || !session || !revokeTimeRange) {
+        setBulkRevokeStatus('Cannot revoke by time: Missing agent, session, or time range.');
         return;
     }
 
@@ -1069,40 +1084,62 @@ function Verifier() {
             return;
     }
 
-    // Filter verifications created after the cutoff time
-    const verificationsToRevoke = verifications.filter(v => 
-        new Date(v.createdAt) > cutoffTime
-    );
-
-    const count = verificationsToRevoke.length;
-    if (count === 0) {
-        setBulkRevokeStatus(`No verifications found created within the selected time range (${revokeTimeRange}).`);
-        return;
-    }
-
-    // Confirmation dialog
-    if (!window.confirm(`Are you sure you want to revoke ${count} verification(s) created in the last ${revokeTimeRange}? This cannot be undone.`)) {
-        return;
-    }
-
     setIsRevoking(true);
-    setBulkRevokeStatus(`Starting revocation for ${count} record(s) created in the last ${revokeTimeRange}...`);
+    setBulkRevokeStatus('Fetching all your verification records...');
     setBulkRevokeProgress('');
-    setRevokeStatusMessage(''); // Clear single revoke status
+    setRevokeStatusMessage('');
 
     let successCount = 0;
     let failureCount = 0;
     const errors = [];
+    let verificationsToRevoke = [];
+    let count = 0;
 
     try {
+        // *** Fetch ALL existing verification records ***
+        const allVerificationRecords = await fetchAllPaginated(
+            agent.api.com.atproto.repo, // Context: repo API
+            'listRecords',             // Method: listRecords
+            {                          // Params:
+                repo: session.did,
+                collection: 'app.bsky.graph.verification',
+                limit: 100 // fetchAllPaginated handles pagination
+            },
+            false // Use agent method
+        );
+        console.log(`Fetched ${allVerificationRecords.length} total verification records for time-based revocation.`);
+
+        // Filter the *complete* list based on creation time
+        verificationsToRevoke = allVerificationRecords.filter(record =>
+            record.value?.createdAt && new Date(record.value.createdAt) > cutoffTime
+        );
+
+        count = verificationsToRevoke.length;
+        if (count === 0) {
+            setBulkRevokeStatus(`No verifications found created within the selected time range (${revokeTimeRange}).`);
+            setIsRevoking(false); // Stop early
+            return;
+        }
+
+        // Confirmation dialog (now that we know the count)
+        if (!window.confirm(`Are you sure you want to revoke ${count} verification(s) created in the last ${revokeTimeRange}? This cannot be undone.`)) {
+            setIsRevoking(false); // User cancelled
+            setBulkRevokeStatus('Time-based revocation cancelled.');
+            return;
+        }
+
+        setBulkRevokeStatus(`Starting revocation for ${count} record(s) created in the last ${revokeTimeRange}...`);
+
         // Iterate and revoke each matching verification
         for (let i = 0; i < verificationsToRevoke.length; i++) {
-            const verification = verificationsToRevoke[i];
-            const handle = verification.handle || verification.subject; // Use handle if available
-            setBulkRevokeProgress(`Revoking ${i + 1} of ${count}: @${handle} (Created: ${new Date(verification.createdAt).toLocaleTimeString()})`);
+            const verificationRecord = verificationsToRevoke[i];
+             // Use handle from record value if available, fallback to subject DID
+            const handle = verificationRecord.value?.handle || verificationRecord.value?.subject || 'unknown';
+            const createdAtStr = verificationRecord.value?.createdAt ? new Date(verificationRecord.value.createdAt).toLocaleTimeString() : 'unknown time';
+            setBulkRevokeProgress(`Revoking ${i + 1} of ${count}: @${handle} (Created: ${createdAtStr})`);
 
             try {
-                const parts = verification.uri.split('/');
+                const parts = verificationRecord.uri.split('/');
                 const rkey = parts[parts.length - 1];
 
                 await agent.api.com.atproto.repo.deleteRecord({
@@ -1112,7 +1149,7 @@ function Verifier() {
                 });
                 successCount++;
             } catch (error) {
-                console.error(`Failed to revoke @${handle} (URI: ${verification.uri}):`, error);
+                console.error(`Failed to revoke @${handle} (URI: ${verificationRecord.uri}):`, error);
                 failureCount++;
                 errors.push(`@${handle}: ${error.message || 'Unknown error'}`);
             }
@@ -1127,7 +1164,7 @@ function Verifier() {
             finalMessage += `Check console for details on failures.`;
         }
         setBulkRevokeStatus(finalMessage);
-        fetchVerifications(); // Refresh the list of verified accounts
+        fetchVerifications(); // Refresh the list of verified accounts displayed in UI
 
     } catch (error) {
         console.error('Error during time-based revocation process:', error);

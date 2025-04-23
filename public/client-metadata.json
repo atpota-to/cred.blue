@@ -1,9 +1,9 @@
 {
-  "client_id": "https://testing.cred.blue/client-metadata.json",
+  "client_id": "https://cred.blue/client-metadata.json",
   "client_name": "cred.blue",
-  "client_uri": "https://testing.cred.blue",
+  "client_uri": "https://cred.blue",
   "redirect_uris": [
-    "https://testing.cred.blue/login/callback"
+    "https://cred.blue/login/callback"
   ],
   "scope": "atproto transition:generic",
   "grant_types": [

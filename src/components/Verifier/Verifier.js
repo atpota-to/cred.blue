@@ -210,19 +210,22 @@ function Verifier() {
           try {
             // *** Get the specific PDS for the verified user ***
             const targetDid = verification.subject;
+            /* // Remove PDS lookup - use public API instead
             const pdsEndpoint = await getPdsEndpoint(targetDid);
 
             if (!pdsEndpoint) {
               throw new Error(`Could not find PDS for ${verification.handle || targetDid}`);
             }
+            */
 
-            // *** Use direct fetch to get the profile from the correct PDS ***
-            const profileUrl = `${pdsEndpoint}/xrpc/app.bsky.actor.getProfile?actor=${encodeURIComponent(targetDid)}`;
+            // *** Use direct fetch from the public AppView to get the profile ***
+            const publicApiBase = 'https://public.api.bsky.app';
+            const profileUrl = `${publicApiBase}/xrpc/app.bsky.actor.getProfile?actor=${encodeURIComponent(targetDid)}`;
             const profileResponse = await fetch(profileUrl);
 
             if (!profileResponse.ok) {
                 // If profile fetch fails (e.g., 404), mark validity check failed
-                throw new Error(`Failed to fetch profile from ${pdsEndpoint}: ${profileResponse.status}`);
+                throw new Error(`Failed to fetch profile from public API: ${profileResponse.status}`);
             }
             const profileData = await profileResponse.json();
 

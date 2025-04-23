@@ -150,6 +150,12 @@ function Verifier() {
   const [bulkVerifyStatus, setBulkVerifyStatus] = useState(''); // Status message for bulk operations
   const [bulkVerifyProgress, setBulkVerifyProgress] = useState(''); // Progress indicator (e.g., "10/50")
 
+  // State for list revocation
+  const [revokeMode, setRevokeMode] = useState('single'); // 'single' or 'list'
+  const [selectedListUriForRevoke, setSelectedListUriForRevoke] = useState('');
+  const [bulkRevokeStatus, setBulkRevokeStatus] = useState(''); // Status message for bulk revoke
+  const [bulkRevokeProgress, setBulkRevokeProgress] = useState(''); // Progress for bulk revoke
+
   useEffect(() => {
     if (session) {
       const agentInstance = new Agent(session);
@@ -771,6 +777,110 @@ function Verifier() {
     }
   };
 
+  // Handler for revoking a list
+  const handleRevokeList = async (e) => {
+    e.preventDefault();
+    if (!agent || !session || !selectedListUriForRevoke) {
+        setBulkRevokeStatus('Please select a list to revoke.');
+        return;
+    }
+
+    const selectedList = userLists.find(list => list.uri === selectedListUriForRevoke);
+    if (!selectedList) {
+        setBulkRevokeStatus('Selected list not found.');
+        return;
+    }
+
+    // Confirmation dialog
+    if (!window.confirm(`Are you sure you want to revoke verifications for all users found in the list "${selectedList.name}"? This cannot be undone.`)) {
+        return;
+    }
+
+    setIsRevoking(true);
+    setBulkRevokeStatus(`Fetching members of list: ${selectedList.name}...`);
+    setBulkRevokeProgress('');
+    setRevokeStatusMessage(''); // Clear single revoke status
+
+    let successCount = 0;
+    let failureCount = 0;
+    let totalToRevoke = 0;
+    const errors = [];
+
+    try {
+        // Fetch all items from the selected list
+        const listItems = await fetchAllPaginated(
+            agent.api.app.bsky.graph,
+            'getList',
+            { list: selectedListUriForRevoke, limit: 100 },
+            false
+        );
+
+        if (listItems.length === 0) {
+            setBulkRevokeStatus(`List "${selectedList.name}" is empty. No users to check for revocation.`);
+            setIsRevoking(false);
+            return;
+        }
+
+        const listMemberDids = new Set(listItems.map(item => item.subject.did));
+
+        // Filter existing verifications to find those matching list members
+        const verificationsToRevoke = verifications.filter(verification =>
+            listMemberDids.has(verification.subject)
+        );
+
+        totalToRevoke = verificationsToRevoke.length;
+        setBulkRevokeStatus(`Found ${totalToRevoke} existing verification(s) matching users in "${selectedList.name}". Starting revocation...`);
+
+        if (totalToRevoke === 0) {
+            setBulkRevokeStatus(`No existing verifications match users in the list "${selectedList.name}".`);
+            setIsRevoking(false);
+            return;
+        }
+
+        // Iterate and revoke each matching verification
+        for (let i = 0; i < verificationsToRevoke.length; i++) {
+            const verification = verificationsToRevoke[i];
+            const handle = verification.handle || verification.subject; // Use handle if available
+            setBulkRevokeProgress(`Revoking ${i + 1} of ${totalToRevoke}: @${handle}`);
+
+            try {
+                const parts = verification.uri.split('/');
+                const rkey = parts[parts.length - 1];
+
+                await agent.api.com.atproto.repo.deleteRecord({
+                    repo: session.did,
+                    collection: 'app.bsky.graph.verification',
+                    rkey: rkey
+                });
+                successCount++;
+            } catch (error) {
+                console.error(`Failed to revoke @${handle} (URI: ${verification.uri}):`, error);
+                failureCount++;
+                errors.push(`@${handle}: ${error.message || 'Unknown error'}`);
+            }
+        }
+
+        // Final status message
+        let finalMessage = `Bulk revocation complete for list "${selectedList.name}". \n`;
+        finalMessage += `Successfully revoked: ${successCount}. \n`;
+        if (failureCount > 0) {
+            finalMessage += `Failed: ${failureCount}. \n`;
+            console.log("Bulk revocation errors:", errors);
+            finalMessage += `Check console for details on failures.`;
+        }
+        setBulkRevokeStatus(finalMessage);
+        fetchVerifications(); // Refresh the list of verified accounts
+        setSelectedListUriForRevoke(''); // Reset selection
+
+    } catch (error) {
+        console.error('Failed to fetch or process list items for revocation:', error);
+        setBulkRevokeStatus(`Error during bulk revocation for "${selectedList.name}": ${error.message || 'Unknown error'}`);
+    } finally {
+        setIsRevoking(false);
+        setBulkRevokeProgress('');
+    }
+  };
+
   // Handler to hide suggestions when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -998,39 +1108,102 @@ Check yours: https://cred.blue/verifier`;
           <h2>Accounts You've Verified</h2>
         </div>
 
-        {revokeStatusMessage && (
-          <div className={`verifier-status-box ${revokeStatusMessage.includes('failed') ? 'verifier-status-box-error' : 'verifier-status-box-success'}`}>
-             <p>{revokeStatusMessage}</p>
+        {/* Revoke Mode Toggle */}
+        <div className="verifier-mode-toggle">
+          <label>
+            <input
+              type="radio"
+              name="revokeMode"
+              value="single"
+              checked={revokeMode === 'single'}
+              onChange={() => setRevokeMode('single')}
+              disabled={isRevoking || isFetchingLists}
+            />
+            Manage Individual
+          </label>
+          <label>
+            <input
+              type="radio"
+              name="revokeMode"
+              value="list"
+              checked={revokeMode === 'list'}
+              onChange={() => setRevokeMode('list')}
+              disabled={isRevoking || isFetchingLists}
+            />
+            Revoke by List
+          </label>
+        </div>
+
+        {/* Combined Status Area for Revocation */} 
+        {(revokeStatusMessage || bulkRevokeStatus || bulkRevokeProgress) && (
+          <div className={`verifier-status-box 
+            ${(revokeStatusMessage && revokeStatusMessage.includes('failed')) || 
+              (bulkRevokeStatus && (bulkRevokeStatus.includes('failed') || bulkRevokeStatus.includes('Error'))) 
+              ? 'verifier-status-box-error' 
+              : 'verifier-status-box-success'}
+            ${bulkRevokeProgress ? ' verifier-status-box-progress' : ''}
+          `}>
+              {/* Show single status OR bulk status, prioritizing bulk status if active */}
+              {bulkRevokeStatus ? <p>{bulkRevokeStatus}</p> : revokeStatusMessage ? <p>{revokeStatusMessage}</p> : null}
+              {/* Show bulk progress if available */}
+              {bulkRevokeProgress && <p className="verifier-bulk-progress">{bulkRevokeProgress}</p>}
           </div>
         )}
 
-        {isLoadingVerifications ? (<p>Loading...</p>) : verifications.length === 0 ? (<p>You haven't verified any accounts.</p>) : (
-          <ul className="verifier-list">
-            {verifications.map((verification) => (
-              <li key={verification.uri} className={`verifier-list-item ${verification.validityChecked && !verification.isValid ? 'verifier-list-item-invalid' : ''}`}>
-                <div className="verifier-list-item-content">
-                  <a href={`https://bsky.app/profile/${verification.handle}`} target="_blank" rel="noopener noreferrer" className="verifier-profile-link">
-                    <span className="verifier-display-name">{verification.displayName}</span>
-                    <span className="verifier-list-item-handle">@{verification.handle}</span>
-                  </a>
-                  {verification.validityChecked && (
-                    <span className={`verifier-validity-status ${verification.isValid ? 'valid' : 'invalid'}`}>
-                      {verification.isValid ? '✅ Valid' : '❌ Changed'}
-                    </span>
-                  )}
-                  {!verification.validityChecked && isCheckingValidity && (
-                      <span className="verifier-validity-status checking">⏳ Checking...</span>
-                  )}
-                  <div className="verifier-list-item-date">Verified: {new Date(verification.createdAt).toLocaleString()}</div>
-                </div>
-                <div className="verifier-list-item-actions">
-                  <button onClick={() => handleRevoke(verification)} disabled={isRevoking || isLoadingVerifications} className="verifier-revoke-button">
-                    {(isRevoking && revokeStatusMessage.includes(verification.handle)) ? 'Revoking...' : 'Revoke'}
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
+        {/* Conditional Revoke Area */}
+        {revokeMode === 'single' ? (
+            <> {/* Use Fragment to avoid unnecessary divs */} 
+             {isLoadingVerifications ? (<p>Loading...</p>) : verifications.length === 0 ? (<p>You haven't verified any accounts.</p>) : (
+                <ul className="verifier-list">
+                    {verifications.map((verification) => (
+                    <li key={verification.uri} className={`verifier-list-item ${verification.validityChecked && !verification.isValid ? 'verifier-list-item-invalid' : ''}`}>
+                        <div className="verifier-list-item-content">
+                        <a href={`https://bsky.app/profile/${verification.handle}`} target="_blank" rel="noopener noreferrer" className="verifier-profile-link">
+                            <span className="verifier-display-name">{verification.displayName}</span>
+                            <span className="verifier-list-item-handle">@{verification.handle}</span>
+                        </a>
+                        {verification.validityChecked && (
+                            <span className={`verifier-validity-status ${verification.isValid ? 'valid' : 'invalid'}`}>
+                            {verification.isValid ? '✅ Valid' : '❌ Changed'}
+                            </span>
+                        )}
+                        {!verification.validityChecked && isCheckingValidity && (
+                            <span className="verifier-validity-status checking">⏳ Checking...</span>
+                        )}
+                        <div className="verifier-list-item-date">Verified: {new Date(verification.createdAt).toLocaleString()}</div>
+                        </div>
+                        <div className="verifier-list-item-actions">
+                        <button onClick={() => handleRevoke(verification)} disabled={isRevoking || isLoadingVerifications} className="verifier-revoke-button">
+                            {(isRevoking && revokeStatusMessage.includes(verification.handle)) ? 'Revoking...' : 'Revoke'} 
+                        </button>
+                        </div>
+                    </li>
+                    ))}
+                </ul>
+                )}
+            </>
+        ) : (
+             <div className="verifier-input-wrapper"> {/* Reuse wrapper for consistent spacing */} 
+                 <form onSubmit={handleRevokeList} className="verifier-form-container" style={{ marginBottom: 0 }}>
+                     <select
+                         value={selectedListUriForRevoke}
+                         onChange={(e) => setSelectedListUriForRevoke(e.target.value)}
+                         disabled={isRevoking || isFetchingLists || userLists.length === 0}
+                         required
+                         className="verifier-list-select" 
+                     >
+                         <option value="" disabled>{isFetchingLists ? "Loading lists..." : userLists.length === 0 ? "No lists found" : "-- Select list to revoke --"}</option>
+                         {userLists.map(list => (
+                         <option key={list.uri} value={list.uri}>
+                             {list.name} ({list.listItemCount || 0} members)
+                         </option>
+                         ))}
+                     </select>
+                     <button type="submit" disabled={isRevoking || !selectedListUriForRevoke || isFetchingLists} className="verifier-revoke-button"> {/* Reuse revoke button style */} 
+                         {isRevoking ? 'Revoking List...' : 'Revoke Selected List'}
+                     </button>
+                 </form>
+             </div>
         )}
       </div>
     </div>

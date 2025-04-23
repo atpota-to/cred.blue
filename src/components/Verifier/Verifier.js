@@ -279,7 +279,7 @@ function Verifier() {
       const params = {
         repo: session.did,
         collection: 'app.bsky.graph.verification',
-        limit: 100, // Keep fetching 100 at a time
+        limit: 25, // Fetch 25 at a time (changed from 100)
       };
       if (cursor) {
         params.cursor = cursor;
@@ -1396,7 +1396,7 @@ Check yours: https://cred.blue/verifier`;
               onChange={() => setRevokeMode('single')}
               disabled={isRevoking || isFetchingLists}
             />
-            Manage Individual
+            Individual
           </label>
           <label>
             <input
@@ -1407,7 +1407,7 @@ Check yours: https://cred.blue/verifier`;
               onChange={() => setRevokeMode('list')}
               disabled={isRevoking || isFetchingLists}
             />
-            Revoke by List
+            List
           </label>
           <label>
              <input
@@ -1418,7 +1418,7 @@ Check yours: https://cred.blue/verifier`;
                onChange={() => setRevokeMode('time')}
                disabled={isRevoking || isFetchingLists}
              />
-             Revoke by Time
+             Time
           </label>
         </div>
 

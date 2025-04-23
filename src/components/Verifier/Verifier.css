@@ -193,13 +193,6 @@
   box-sizing: border-box; /* Added */
 }
 
-.verifier-list,
-.verifier-verifier-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
 .verifier-verifier-list {
   margin: 0;
   padding-left: 15px;

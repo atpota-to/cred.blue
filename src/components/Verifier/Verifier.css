@@ -534,3 +534,37 @@
     cursor: pointer;
     margin: 0px;
 }
+
+/* Styles for Time-Based Revocation */
+.verifier-time-revoke-wrapper {
+    margin-top: 15px; /* Add some space above the time controls */
+}
+
+.verifier-time-revoke-wrapper p {
+    margin-bottom: 10px; /* Space between description and radios */
+    color: var(--text);
+}
+
+.verifier-time-range-selector {
+    display: flex;
+    flex-direction: column; /* Stack radio buttons vertically */
+    gap: 10px; /* Space between radio buttons */
+    margin-bottom: 15px; /* Space below the radio group */
+}
+
+.verifier-time-range-selector label {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px; /* Space between radio and text */
+    color: var(--text);
+}
+
+.verifier-time-range-selector input[type="radio"] {
+    cursor: pointer;
+    margin: 0;
+}
+
+.verifier-time-revoke-wrapper .verifier-revoke-button {
+     margin-top: 5px; /* Adjust if needed */
+}

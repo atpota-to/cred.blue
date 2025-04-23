@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Agent } from '@atproto/api';
 import './Verifier.css';
@@ -151,10 +151,20 @@ function Verifier() {
   const [bulkVerifyProgress, setBulkVerifyProgress] = useState(''); // Progress indicator (e.g., "10/50")
 
   // State for list revocation
-  const [revokeMode, setRevokeMode] = useState('single'); // 'single' or 'list'
+  const [revokeMode, setRevokeMode] = useState('single'); // 'single' or 'list' or 'time'
   const [selectedListUriForRevoke, setSelectedListUriForRevoke] = useState('');
   const [bulkRevokeStatus, setBulkRevokeStatus] = useState(''); // Status message for bulk revoke
   const [bulkRevokeProgress, setBulkRevokeProgress] = useState(''); // Progress for bulk revoke
+
+  // State for filtering verified accounts
+  const [verificationSearchTerm, setVerificationSearchTerm] = useState('');
+
+  // State for time-based revocation
+  const [revokeTimeRange, setRevokeTimeRange] = useState('30m'); // Default: 30 minutes
+
+  // State for verification list pagination
+  const [verificationsCursor, setVerificationsCursor] = useState(null);
+  const [isLoadingMoreVerifications, setIsLoadingMoreVerifications] = useState(false);
 
   // Verification options
   const [skipDuplicates, setSkipDuplicates] = useState(true);
@@ -181,43 +191,90 @@ function Verifier() {
     }
   }, [session]);
 
-  const fetchVerifications = useCallback(async () => {
+  const fetchVerifications = useCallback(async (cursor) => {
     if (!agent || !session) return;
-    setIsLoadingVerifications(true);
+    
+    // Determine loading state based on whether a cursor is provided
+    if (cursor) {
+        setIsLoadingMoreVerifications(true);
+    } else {
+        setIsLoadingVerifications(true);
+        setVerifications([]); // Clear existing on initial fetch
+        setVerificationsCursor(null); // Reset cursor on initial fetch
+    }
+
     try {
-      const response = await agent.api.com.atproto.repo.listRecords({
+      const params = {
         repo: session.did,
         collection: 'app.bsky.graph.verification',
-        limit: 100,
-      });
-      console.log('Fetched verifications:', response.data);
-      if (response.data.records) {
-        const formatted = response.data.records.map(record => ({
+        limit: 100, // Keep fetching 100 at a time
+      };
+      if (cursor) {
+        params.cursor = cursor;
+      }
+
+      const response = await agent.api.com.atproto.repo.listRecords(params);
+      console.log('Fetched verifications page:', response.data);
+
+      if (response.data.records && response.data.records.length > 0) {
+        const newFormatted = response.data.records.map(record => ({
           uri: record.uri,
           cid: record.cid,
           handle: record.value.handle,
           displayName: record.value.displayName,
           subject: record.value.subject,
           createdAt: record.value.createdAt,
-          isValid: true,
+          isValid: true, // Assume valid initially
           validityChecked: false
         }));
-        setVerifications(formatted);
-        checkVerificationsValidity(formatted);
+
+        // Append if loading more, replace if initial fetch
+        setVerifications(prevVerifications => 
+            cursor ? [...prevVerifications, ...newFormatted] : newFormatted
+        );
+        setVerificationsCursor(response.data.cursor || null); // Store the new cursor
+
+        // Get the updated list *after* state update (or construct it)
+        const updatedVerifications = cursor ? [...verifications, ...newFormatted] : newFormatted;
+
+        // Check validity for the entire updated list
+        // Consider optimizing this later if performance is an issue
+        checkVerificationsValidity(updatedVerifications);
       } else {
-        setVerifications([]);
+         // If initial fetch resulted in no records, ensure list is empty
+         if (!cursor) {
+            setVerifications([]);
+            setVerificationsCursor(null);
+         }
+         // If loading more resulted in no records, just clear the cursor
+         if (cursor) {
+            setVerificationsCursor(null);
+         }
       }
     } catch (error) {
       console.error('Failed to fetch verifications:', error);
-      setStatusMessage(`Failed to load verifications: ${error.message || 'Unknown error'}`);
+      // Use appropriate status based on load type
+      const statusMsg = `Failed to load verifications: ${error.message || 'Unknown error'}`;
+      if(cursor) setRevokeStatusMessage(statusMsg); // Show error near list
+      else setStatusMessage(statusMsg); // Show error near top form
     } finally {
-      setIsLoadingVerifications(false);
+        if (cursor) {
+             setIsLoadingMoreVerifications(false);
+        } else {
+            setIsLoadingVerifications(false);
+        }
     }
-  }, [agent, session]);
+    // Note: Removing 'verifications' from dependency array to prevent potential infinite loop
+    // The logic relies on setVerifications using the functional update form or constructing the new list manually.
+  }, [agent, session, checkVerificationsValidity]);
 
   const checkVerificationsValidity = useCallback(async (verificationsList) => {
-    if (!agent || verificationsList.length === 0) return;
-    if (verificationsList.length === 0) return;
+    if (!verificationsList || verificationsList.length === 0) {
+        console.log("checkVerificationsValidity called with empty or null list.");
+        return; // Exit early if list is empty
+    }
+    // if (!agent || verificationsList.length === 0) return;
+    // Removed agent check as it's not directly used here anymore
 
     setIsCheckingValidity(true);
     const updatedVerifications = [...verificationsList];
@@ -456,8 +513,8 @@ function Verifier() {
         const followsPseudoList = {
             uri: 'special:follows',
             name: 'My Follows',
-            // We don't fetch the count here for performance, handle display in component
-            listItemCount: null // Indicate count is unknown/dynamic
+            // Use follows count from userInfo if available
+            listItemCount: userInfo?.followsCount ?? 0 // Default to 0 if not found
         };
 
         setUserLists([followsPseudoList, ...(lists || [])]); // Add follows list at the beginning
@@ -478,14 +535,16 @@ function Verifier() {
             setBulkVerifyStatus('');
         }
     }
-  }, [agent, session]);
+  }, [agent, session, userInfo]);
 
   useEffect(() => {
-    if (agent) {
-      fetchVerifications();
-      fetchUserLists(); // Fetch lists when agent is ready
+    if (agent && userInfo) { // Wait for both agent and userInfo
+      fetchVerifications(); // Initial fetch (no cursor)
+      fetchUserLists(); // Fetch lists when agent and userInfo are ready
     }
-  }, [agent, fetchVerifications, fetchUserLists]); // Add fetchUserLists dependency
+    // Intentionally not depending on fetchVerifications/fetchUserLists to avoid loops if they change identity
+    // We only want this effect to run when agent or userInfo changes.
+  }, [agent, userInfo, fetchVerifications, fetchUserLists]); // Add userInfo dependency
 
   const checkOfficialVerification = useCallback(async () => {
     if (!session?.did) return;
@@ -979,6 +1038,100 @@ function Verifier() {
     }
   };
 
+  // Handler for revoking by time range
+  const handleRevokeByTime = async () => {
+    if (!agent || !session || !revokeTimeRange || verifications.length === 0) {
+        setBulkRevokeStatus('Cannot revoke by time: Missing agent, session, time range, or no verifications found.');
+        return;
+    }
+
+    // Calculate cutoff time
+    const now = new Date();
+    let cutoffTime = new Date(now); // Copy current time
+    switch (revokeTimeRange) {
+        case '30m':
+            cutoffTime.setMinutes(now.getMinutes() - 30);
+            break;
+        case '1h':
+            cutoffTime.setHours(now.getHours() - 1);
+            break;
+        case '1d':
+            cutoffTime.setDate(now.getDate() - 1);
+            break;
+        default:
+            setBulkRevokeStatus('Invalid time range selected.');
+            return;
+    }
+
+    // Filter verifications created after the cutoff time
+    const verificationsToRevoke = verifications.filter(v => 
+        new Date(v.createdAt) > cutoffTime
+    );
+
+    const count = verificationsToRevoke.length;
+    if (count === 0) {
+        setBulkRevokeStatus(`No verifications found created within the selected time range (${revokeTimeRange}).`);
+        return;
+    }
+
+    // Confirmation dialog
+    if (!window.confirm(`Are you sure you want to revoke ${count} verification(s) created in the last ${revokeTimeRange}? This cannot be undone.`)) {
+        return;
+    }
+
+    setIsRevoking(true);
+    setBulkRevokeStatus(`Starting revocation for ${count} record(s) created in the last ${revokeTimeRange}...`);
+    setBulkRevokeProgress('');
+    setRevokeStatusMessage(''); // Clear single revoke status
+
+    let successCount = 0;
+    let failureCount = 0;
+    const errors = [];
+
+    try {
+        // Iterate and revoke each matching verification
+        for (let i = 0; i < verificationsToRevoke.length; i++) {
+            const verification = verificationsToRevoke[i];
+            const handle = verification.handle || verification.subject; // Use handle if available
+            setBulkRevokeProgress(`Revoking ${i + 1} of ${count}: @${handle} (Created: ${new Date(verification.createdAt).toLocaleTimeString()})`);
+
+            try {
+                const parts = verification.uri.split('/');
+                const rkey = parts[parts.length - 1];
+
+                await agent.api.com.atproto.repo.deleteRecord({
+                    repo: session.did,
+                    collection: 'app.bsky.graph.verification',
+                    rkey: rkey
+                });
+                successCount++;
+            } catch (error) {
+                console.error(`Failed to revoke @${handle} (URI: ${verification.uri}):`, error);
+                failureCount++;
+                errors.push(`@${handle}: ${error.message || 'Unknown error'}`);
+            }
+        }
+
+        // Final status message
+        let finalMessage = `Time-based revocation complete (${revokeTimeRange}). \n`;
+        finalMessage += `Successfully revoked: ${successCount}. \n`;
+        if (failureCount > 0) {
+            finalMessage += `Failed: ${failureCount}. \n`;
+            console.log("Time-based revocation errors:", errors);
+            finalMessage += `Check console for details on failures.`;
+        }
+        setBulkRevokeStatus(finalMessage);
+        fetchVerifications(); // Refresh the list of verified accounts
+
+    } catch (error) {
+        console.error('Error during time-based revocation process:', error);
+        setBulkRevokeStatus(`Error during time-based revocation (${revokeTimeRange}): ${error.message || 'Unknown error'}`);
+    } finally {
+        setIsRevoking(false);
+        setBulkRevokeProgress('');
+    }
+  };
+
   // Handler to hide suggestions when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -999,6 +1152,13 @@ function Verifier() {
   const handleInputFocus = () => {
     if (targetHandle.trim() !== '' && suggestions.length > 0) {
       setShowSuggestions(true);
+    }
+  };
+
+  // Handler to load more verifications
+  const handleLoadMoreVerifications = () => {
+    if (verificationsCursor && !isLoadingMoreVerifications) {
+        fetchVerifications(verificationsCursor);
     }
   };
 
@@ -1243,6 +1403,17 @@ Check yours: https://cred.blue/verifier`;
             />
             Revoke by List
           </label>
+          <label>
+             <input
+               type="radio"
+               name="revokeMode"
+               value="time"
+               checked={revokeMode === 'time'}
+               onChange={() => setRevokeMode('time')}
+               disabled={isRevoking || isFetchingLists}
+             />
+             Revoke by Time
+          </label>
         </div>
 
         {/* Combined Status Area for Revocation */} 
@@ -1264,36 +1435,34 @@ Check yours: https://cred.blue/verifier`;
         {/* Conditional Revoke Area */}
         {revokeMode === 'single' ? (
             <> {/* Use Fragment to avoid unnecessary divs */} 
-             {isLoadingVerifications ? (<p>Loading...</p>) : verifications.length === 0 ? (<p>You haven't verified any accounts.</p>) : (
-                <ul className="verifier-list">
-                    {verifications.map((verification) => (
-                    <li key={verification.uri} className={`verifier-list-item ${verification.validityChecked && !verification.isValid ? 'verifier-list-item-invalid' : ''}`}>
-                        <div className="verifier-list-item-content">
-                        <a href={`https://bsky.app/profile/${verification.handle}`} target="_blank" rel="noopener noreferrer" className="verifier-profile-link">
-                            <span className="verifier-display-name">{verification.displayName}</span>
-                            <span className="verifier-list-item-handle">@{verification.handle}</span>
-                        </a>
-                        {verification.validityChecked && (
-                            <span className={`verifier-validity-status ${verification.isValid ? 'valid' : 'invalid'}`}>
-                            {verification.isValid ? '✅ Valid' : '❌ Changed'}
-                            </span>
-                        )}
-                        {!verification.validityChecked && isCheckingValidity && (
-                            <span className="verifier-validity-status checking">⏳ Checking...</span>
-                        )}
-                        <div className="verifier-list-item-date">Verified: {new Date(verification.createdAt).toLocaleString()}</div>
-                        </div>
-                        <div className="verifier-list-item-actions">
-                        <button onClick={() => handleRevoke(verification)} disabled={isRevoking || isLoadingVerifications} className="verifier-revoke-button">
-                            {(isRevoking && revokeStatusMessage.includes(verification.handle)) ? 'Revoking...' : 'Revoke'} 
-                        </button>
-                        </div>
-                    </li>
-                    ))}
-                </ul>
-                )}
+             {/* Search Input */} 
+             <div className="verifier-search-input-wrapper">
+                <input 
+                    type="text"
+                    placeholder="Search verified accounts..."
+                    value={verificationSearchTerm}
+                    onChange={(e) => setVerificationSearchTerm(e.target.value)}
+                    className="verifier-input-field"
+                    disabled={isLoadingVerifications || isRevoking}
+                />
+             </div>
+
+             {/* Use the new VerificationList component */} 
+             <VerificationList 
+                verifications={verifications}
+                isLoading={isLoadingVerifications}
+                isCheckingValidity={isCheckingValidity}
+                isRevoking={isRevoking}
+                revokeStatusMessage={revokeStatusMessage} // Pass single revoke message
+                handleRevoke={handleRevoke}
+                searchTerm={verificationSearchTerm}
+                // Pass pagination props
+                isLoadingMore={isLoadingMoreVerifications}
+                cursor={verificationsCursor}
+                onLoadMore={handleLoadMoreVerifications} 
+             />
             </>
-        ) : (
+        ) : revokeMode === 'list' ? (
              <div className="verifier-input-wrapper"> {/* Reuse wrapper for consistent spacing */} 
                  <form onSubmit={handleRevokeList} className="verifier-form-container" style={{ marginBottom: 0 }}>
                      <select
@@ -1315,10 +1484,106 @@ Check yours: https://cred.blue/verifier`;
                      </button>
                  </form>
              </div>
+        ) : ( /* revokeMode === 'time' */
+             <div className="verifier-time-revoke-wrapper">
+                <p>Select the time range to revoke verifications created within:</p>
+                 <div className="verifier-time-range-selector">
+                     <label>
+                         <input type="radio" name="revokeTimeRange" value="30m" checked={revokeTimeRange === '30m'} onChange={(e) => setRevokeTimeRange(e.target.value)} disabled={isRevoking} />
+                         Last 30 Minutes
+                     </label>
+                     <label>
+                         <input type="radio" name="revokeTimeRange" value="1h" checked={revokeTimeRange === '1h'} onChange={(e) => setRevokeTimeRange(e.target.value)} disabled={isRevoking} />
+                         Last Hour
+                     </label>
+                     <label>
+                         <input type="radio" name="revokeTimeRange" value="1d" checked={revokeTimeRange === '1d'} onChange={(e) => setRevokeTimeRange(e.target.value)} disabled={isRevoking} />
+                         Last 24 Hours
+                     </label>
+                 </div>
+                 <button 
+                    onClick={handleRevokeByTime} // Need to create this handler
+                    disabled={isRevoking || !revokeTimeRange}
+                    className="verifier-revoke-button"
+                 >
+                    {isRevoking ? 'Revoking by Time...' : 'Revoke Selected Range'}
+                 </button>
+            </div>
         )}
       </div>
     </div>
   );
+}
+
+// Helper component to render the verification list (incorporating search/filter)
+function VerificationList({ 
+    verifications, 
+    isLoading, 
+    isCheckingValidity, 
+    isRevoking, 
+    revokeStatusMessage,
+    handleRevoke,
+    searchTerm,
+    isLoadingMore,
+    cursor,
+    onLoadMore,
+}) {
+    const filteredVerifications = useMemo(() => {
+        if (!searchTerm) {
+            return verifications;
+        }
+        const lowerCaseSearchTerm = searchTerm.toLowerCase();
+        return verifications.filter(v => 
+            v.handle?.toLowerCase().includes(lowerCaseSearchTerm) || 
+            v.displayName?.toLowerCase().includes(lowerCaseSearchTerm)
+        );
+    }, [verifications, searchTerm]);
+
+    if (isLoading) return <p>Loading...</p>;
+    if (verifications.length === 0) return <p>You haven't verified any accounts.</p>;
+    if (filteredVerifications.length === 0 && searchTerm) return <p>No verified accounts match "{searchTerm}".</p>;
+
+    return (
+        <>
+            <ul className="verifier-list">
+                {filteredVerifications.map((verification) => (
+                <li key={verification.uri} className={`verifier-list-item ${verification.validityChecked && !verification.isValid ? 'verifier-list-item-invalid' : ''}`}>
+                    <div className="verifier-list-item-content">
+                        <a href={`https://bsky.app/profile/${verification.handle}`} target="_blank" rel="noopener noreferrer" className="verifier-profile-link">
+                            <span className="verifier-display-name">{verification.displayName}</span>
+                            <span className="verifier-list-item-handle">@{verification.handle}</span>
+                        </a>
+                        {verification.validityChecked && (
+                            <span className={`verifier-validity-status ${verification.isValid ? 'valid' : 'invalid'}`}>
+                            {verification.isValid ? '✅ Valid' : '❌ Changed'}
+                            </span>
+                        )}
+                        {!verification.validityChecked && isCheckingValidity && (
+                            <span className="verifier-validity-status checking">⏳ Checking...</span>
+                        )}
+                        <div className="verifier-list-item-date">Verified: {new Date(verification.createdAt).toLocaleString()}</div>
+                    </div>
+                    <div className="verifier-list-item-actions">
+                        <button onClick={() => handleRevoke(verification)} disabled={isRevoking || isLoading} className="verifier-revoke-button">
+                            {(isRevoking && revokeStatusMessage?.includes(verification.handle)) ? 'Revoking...' : 'Revoke'} 
+                        </button>
+                    </div>
+                </li>
+                ))}
+            </ul>
+            {cursor && (
+                <div className="verifier-load-more-container">
+                    <button 
+                        onClick={onLoadMore}
+                        disabled={isLoadingMore}
+                        className="verifier-action-button"
+                    >
+                        {isLoadingMore ? 'Loading...' : 'Load More'}
+                    </button>
+                </div>
+            )}
+        </>
+    );
 }
 
 export default Verifier; 

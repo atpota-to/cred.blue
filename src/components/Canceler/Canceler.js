@@ -406,7 +406,7 @@ function Canceler() {
 
       for (let i = 0; i < uniqueUserDids.length; i += batchSize) {
         const batchDids = uniqueUserDids.slice(i, i + batchSize);
-        setNetworkStatusMessage(`Checking verification records... (${i + batchDids.length}/${uniqueUserDids.length})`);
+        setNetworkStatusMessage(`Checking cancellation records... (${i + batchDids.length}/${uniqueUserDids.length})`);
 
         const batchPromises = batchDids.map(async (did) => {
           const profile = allProfilesMap.get(did);
@@ -416,7 +416,7 @@ function Canceler() {
 
           const pdsEndpoint = await getPdsEndpoint(did);
           if (!pdsEndpoint) {
-            console.warn(`Skipping verification check for ${profile.handle || did} (no PDS found).`);
+            console.warn(`Skipping cancellation check for ${profile.handle || did} (no PDS found).`);
             return null;
           }
 

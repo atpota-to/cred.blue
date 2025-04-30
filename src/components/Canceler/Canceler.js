@@ -8,7 +8,7 @@ const TRUSTED_VERIFIERS = [
   'bsky.app',
   'nytimes.com',
   'wired.com',
-  'theathletic.bsky.social',
+  'cred.blue',
   'dame.is',
 ];
 
@@ -1226,7 +1226,7 @@ function Canceler() {
       app.bsky.graph.cancellation
       </p>
       <p>
-      Note: this is not an official Bluesky feature and is not supported by the Bluesky team... this is just silly bit.
+      Note: this is not an official Bluesky feature and is not supported by the Bluesky team... this is just a silly bit.
       </p>
       </div>
 

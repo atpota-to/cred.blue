@@ -534,7 +534,7 @@
 
 .canceler-options input[type="checkbox"] {
   cursor: pointer;
-  margin-right: 5px; /* Space between checkbox and label text */
+  margin: 0;
 }
 
 

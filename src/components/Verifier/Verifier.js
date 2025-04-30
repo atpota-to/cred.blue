@@ -1213,6 +1213,11 @@ function Verifier() {
 
   return (
     <div className="verifier-container">
+      {/* Alert box for Canceler tool */}
+      <div className="verifier-status-box verifier-status-box-success" style={{marginBottom: '20px'}}>
+        <p>Looking to cancel someone instead of verify them? Head on over to the <a href="/canceler" style={{fontWeight: 'bold', textDecoration: 'underline'}}>Canceler tool</a>.</p>
+      </div>
+      
       <div className="verifier-intro-container">
       <h1>Bluesky Verifier Tool</h1>
       <p className="verifier-intro-text">

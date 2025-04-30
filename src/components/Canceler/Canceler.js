@@ -8,7 +8,8 @@ const TRUSTED_VERIFIERS = [
   'bsky.app',
   'nytimes.com',
   'wired.com',
-  'theathletic.bsky.social'
+  'theathletic.bsky.social',
+  'dame.is',
 ];
 
 // Helper function modified to handle direct fetch or agent calls
@@ -1358,7 +1359,7 @@ function Canceler() {
           <h2 style={{ display: 'inline-block', marginRight: '0px', marginBottom: '0', border: 'none', padding: '0' }}>Your Official Cancellations</h2>
          </div>
          <p className="canceler-section-description">
-            Checking if any of Bluesky's Trusted Cancelers have created a cancellation record for your username.
+            Checking if any of the cred.blue Trusted Cancelers have created a cancellation record for your username.
          </p>
          <div>
           {TRUSTED_VERIFIERS.map(verifierId => {

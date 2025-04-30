@@ -7,11 +7,11 @@ export const AuthContext = createContext(null);
 
 // Client metadata for Bluesky OAuth
 const clientMetadata = {
-  client_id: `https://testing.cred.blue/client-metadata.json`,
+  client_id: `https://cred.blue/client-metadata.json`,
   client_name: "cred.blue",
-  client_uri: `https://testing.cred.blue`,
-  redirect_uris: [`https://testing.cred.blue/login/callback`],
-  logo_uri: `https://testing.cred.blue/favicon.ico`,
+  client_uri: `https://cred.blue`,
+  redirect_uris: [`https://cred.blue/login/callback`],
+  logo_uri: `https://cred.blue/favicon.ico`,
   scope: "atproto transition:generic",
   grant_types: ["authorization_code", "refresh_token"],
   response_types: ["code"],

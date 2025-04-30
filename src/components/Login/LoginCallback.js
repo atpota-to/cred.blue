@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import './LoginCallback.css'; // Optional: Add styles if needed
 
@@ -7,6 +7,7 @@ const LoginCallback = () => {
   // Get loading and authentication status from AuthContext
   const { loading, isAuthenticated, error: authError } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [localError, setLocalError] = useState(null);
 
   useEffect(() => {
@@ -18,8 +19,12 @@ const LoginCallback = () => {
     // Once loading is complete, check the authentication status
     if (isAuthenticated) {
       console.log('(LoginCallback) Authentication successful, redirecting...');
-      // TODO: Implement state parsing for returnUrl if needed
-      const returnUrl = '/verifier'; // Changed redirect target
+      
+      // Parse returnUrl from query parameters
+      const searchParams = new URLSearchParams(location.search);
+      const returnUrl = searchParams.get('returnUrl') || '/verifier';
+      
+      console.log(`(LoginCallback) Redirecting to: ${returnUrl}`);
       navigate(returnUrl, { replace: true }); // Use replace to avoid callback in history
     } else {
       // If not authenticated after loading, something went wrong
@@ -27,7 +32,7 @@ const LoginCallback = () => {
       setLocalError(authError || 'Authentication failed. Please try logging in again.');
     }
 
-  }, [loading, isAuthenticated, navigate, authError]); // Depend on loading and auth state
+  }, [loading, isAuthenticated, navigate, authError, location]); // Added location dependency
 
   // Display loading message
   if (loading) {

@@ -5,12 +5,20 @@ import './LoginCallback.css'; // Optional: Add styles if needed
 
 const LoginCallback = () => {
   // Get loading and authentication status from AuthContext
-  const { loading, isAuthenticated, error: authError } = useAuth();
+  const { loading, isAuthenticated, error: authError, session } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [localError, setLocalError] = useState(null);
 
   useEffect(() => {
+    // Log location information for debugging
+    console.log('(LoginCallback) Current location:', {
+      pathname: location.pathname,
+      search: location.search,
+      hash: location.hash,
+      state: location.state
+    });
+
     // Don't do anything until the AuthProvider is done loading
     if (loading) {
       return;
@@ -20,19 +28,49 @@ const LoginCallback = () => {
     if (isAuthenticated) {
       console.log('(LoginCallback) Authentication successful, redirecting...');
       
-      // Parse returnUrl from query parameters
-      const searchParams = new URLSearchParams(location.search);
-      const returnUrl = searchParams.get('returnUrl') || '/verifier';
+      // First, try to get returnUrl from localStorage (set during login)
+      let returnUrl = localStorage.getItem('auth_redirect_url');
+      console.log('(LoginCallback) Found returnUrl in localStorage:', returnUrl);
       
-      console.log(`(LoginCallback) Redirecting to: ${returnUrl}`);
-      navigate(returnUrl, { replace: true }); // Use replace to avoid callback in history
+      // Parse returnUrl from query parameters (if present)
+      const searchParams = new URLSearchParams(location.search);
+      if (searchParams.has('returnUrl')) {
+        returnUrl = searchParams.get('returnUrl');
+        console.log(`(LoginCallback) Overriding with returnUrl from URL:`, returnUrl);
+      }
+      
+      // Check if we have state data from the OAuth callback
+      if (session?.state) {
+        try {
+          // The state is stored as a JSON string
+          const stateData = JSON.parse(session.state);
+          if (stateData && stateData.returnUrl) {
+            console.log(`(LoginCallback) Found returnUrl in OAuth state:`, stateData.returnUrl);
+            returnUrl = stateData.returnUrl;
+          }
+        } catch (err) {
+          console.error('(LoginCallback) Error parsing state data:', err);
+        }
+      }
+      
+      // Fallback to /verifier if no returnUrl found
+      if (!returnUrl) {
+        returnUrl = '/verifier';
+        console.log(`(LoginCallback) No returnUrl found, defaulting to:`, returnUrl);
+      }
+      
+      // Clean up localStorage
+      localStorage.removeItem('auth_redirect_url');
+      
+      console.log(`(LoginCallback) Final redirect destination:`, returnUrl);
+      navigate(returnUrl, { replace: true });
     } else {
       // If not authenticated after loading, something went wrong
       console.error('(LoginCallback) Authentication failed after loading.');
       setLocalError(authError || 'Authentication failed. Please try logging in again.');
     }
 
-  }, [loading, isAuthenticated, navigate, authError, location]); // Added location dependency
+  }, [loading, isAuthenticated, navigate, authError, location, session]); // Added session dependency
 
   // Display loading message
   if (loading) {

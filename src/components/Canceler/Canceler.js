@@ -672,7 +672,7 @@ function Canceler() {
         collection: 'app.bsky.graph.cancellation',
         record: verificationRecord,
       });
-      const postText = `I just canceled @${targetHandle} using Bluesky's new cancellation system. Try canceling someone yourself using @cred.blue's canceler tool: https://cred.blue/canceler`;
+      const postText = `I just canceled @${targetHandle} using the new cancellation system. Try canceling someone yourself using @cred.blue's canceler tool: https://cred.blue/canceler`;
       const encodedText = encodeURIComponent(postText);
       const intentUrl = `https://bsky.app/intent/compose?text=${encodedText}`;
       const successMessageJSX = (
@@ -1216,13 +1216,16 @@ function Canceler() {
       <div className="canceler-intro-container">
       <h1>Bluesky Cancellation Tool</h1>
       <p className="canceler-intro-text">
-        With Bluesky's new cancellation system, anyone can cancel anyone else and any Bluesky client can choose which accounts to treat as "Trusted Cancelers".
+        With the new cancellation system, anyone can cancel anyone else and any Bluesky client can choose which accounts to treat as "Trusted Cancelers".
       </p>
       <p className="canceler-intro-text">
         Try canceling an account for yourself or check to see who has canceled you! It's as simple as creating a cancellation record in your PDS that points to the account you want to cancel. The record looks like this: 
       </p>
       <p>
       app.bsky.graph.cancellation
+      </p>
+      <p>
+      Note: this is not an official Bluesky feature and is not supported by the Bluesky team... this is just silly bit.
       </p>
       </div>
 

@@ -919,7 +919,7 @@ function Canceler() {
   const handleRevokeList = async (e) => {
     e.preventDefault();
     if (!agent || !session || !selectedListUriForRevoke) {
-        setBulkRevokeStatus('Please select a list to restore.');
+        setBulkRevokeStatus('Please select a list to uncancel.');
         return;
     }
 
@@ -936,7 +936,7 @@ function Canceler() {
     }
 
     // Confirmation dialog
-    if (!window.confirm(`Are you sure you want to restore cancellations for all users found in ${sourceDescription}? This cannot be undone.`)) {
+    if (!window.confirm(`Are you sure you want to uncancel all users found in ${sourceDescription}? This cannot be undone.`)) {
         return;
     }
 
@@ -982,7 +982,7 @@ function Canceler() {
 
         if (fetchedItems.length === 0 && selectedListUriForRevoke !== followsListUri) {
             // Only show empty message if it wasn't the follows list (or if follows *was* empty)
-            setBulkRevokeStatus(`List "${selectedList.name}" is empty. No users to check for restoration.`);
+            setBulkRevokeStatus(`List "${selectedList.name}" is empty. No users to check for uncancellation.`);
             setIsRevoking(false);
             return;
         }
@@ -1007,7 +1007,7 @@ function Canceler() {
         );
 
         totalToRevoke = cancellationsToRestore.length;
-        setBulkRevokeStatus(`Found ${totalToRevoke} existing cancellation(s) matching users in ${sourceDescription}. Starting restoration...`);
+        setBulkRevokeStatus(`Found ${totalToRevoke} existing cancellation(s) matching users in ${sourceDescription}. Starting uncancellation...`);
 
         if (totalToRevoke === 0) {
             setBulkRevokeStatus(`No existing cancellations match users in the ${sourceDescription}.`);
@@ -1020,7 +1020,7 @@ function Canceler() {
             const cancellationRecord = cancellationsToRestore[i];
             // Use handle from record value if available, fallback to subject DID
             const handle = cancellationRecord.value?.handle || cancellationRecord.value?.subject || 'unknown'; 
-            setBulkRevokeProgress(`Restoring ${i + 1} of ${totalToRevoke}: @${handle}`);
+            setBulkRevokeProgress(`Uncanceling ${i + 1} of ${totalToRevoke}: @${handle}`);
 
             try {
                 const parts = cancellationRecord.uri.split('/');
@@ -1033,18 +1033,18 @@ function Canceler() {
                 });
                 successCount++;
             } catch (error) {
-                console.error(`Failed to restore @${handle} (URI: ${cancellationRecord.uri}):`, error);
+                console.error(`Failed to uncancel @${handle} (URI: ${cancellationRecord.uri}):`, error);
                 failureCount++;
                 errors.push(`@${handle}: ${error.message || 'Unknown error'}`);
             }
         }
 
         // Final status message
-        let finalMessage = `Bulk restoration complete for ${sourceDescription}. \n`;
-        finalMessage += `Successfully restored: ${successCount}. \n`;
+        let finalMessage = `Bulk uncancellation complete for ${sourceDescription}. \n`;
+        finalMessage += `Successfully uncancelled: ${successCount}. \n`;
         if (failureCount > 0) {
             finalMessage += `Failed: ${failureCount}. \n`;
-            console.log("Bulk restoration errors:", errors);
+            console.log("Bulk uncancellation errors:", errors);
             finalMessage += `Check console for details on failures.`;
         }
         setBulkRevokeStatus(finalMessage);
@@ -1052,8 +1052,8 @@ function Canceler() {
         setSelectedListUriForRevoke(''); // Reset selection
 
     } catch (error) {
-        console.error('Failed to fetch or process items for restoration:', error);
-        setBulkRevokeStatus(`Error during bulk restoration for ${sourceDescription}: ${error.message || 'Unknown error'}`);
+        console.error('Failed to fetch or process items for uncancellation:', error);
+        setBulkRevokeStatus(`Error during bulk uncancellation for ${sourceDescription}: ${error.message || 'Unknown error'}`);
     } finally {
         setIsRevoking(false);
         setBulkRevokeProgress('');
@@ -1063,7 +1063,7 @@ function Canceler() {
   // Handler for revoking by time range
   const handleRevokeByTime = async () => {
     if (!agent || !session || !revokeTimeRange) {
-        setBulkRevokeStatus('Cannot restore by time: Missing agent, session, or time range.');
+        setBulkRevokeStatus('Cannot uncancel by time: Missing agent, session, or time range.');
         return;
     }
 
@@ -1108,7 +1108,7 @@ function Canceler() {
             },
             false // Use agent method
         );
-        console.log(`Fetched ${allCancellationRecords.length} total cancellation records for time-based restoration.`);
+        console.log(`Fetched ${allCancellationRecords.length} total cancellation records for time-based uncancellation.`);
 
         // Filter the *complete* list based on creation time
         cancellationsToRestore = allCancellationRecords.filter(record =>
@@ -1123,13 +1123,13 @@ function Canceler() {
         }
 
         // Confirmation dialog (now that we know the count)
-        if (!window.confirm(`Are you sure you want to restore ${count} cancellation(s) created in the last ${revokeTimeRange}? This cannot be undone.`)) {
+        if (!window.confirm(`Are you sure you want to uncancel ${count} cancellation(s) created in the last ${revokeTimeRange}? This cannot be undone.`)) {
             setIsRevoking(false); // User cancelled
-            setBulkRevokeStatus('Time-based restoration cancelled.');
+            setBulkRevokeStatus('Time-based uncancellation cancelled.');
             return;
         }
 
-        setBulkRevokeStatus(`Starting restoration for ${count} record(s) created in the last ${revokeTimeRange}...`);
+        setBulkRevokeStatus(`Starting uncancellation for ${count} record(s) created in the last ${revokeTimeRange}...`);
 
         // Iterate and restore each matching cancellation
         for (let i = 0; i < cancellationsToRestore.length; i++) {
@@ -1137,7 +1137,7 @@ function Canceler() {
              // Use handle from record value if available, fallback to subject DID
             const handle = cancellationRecord.value?.handle || cancellationRecord.value?.subject || 'unknown';
             const createdAtStr = cancellationRecord.value?.createdAt ? new Date(cancellationRecord.value.createdAt).toLocaleTimeString() : 'unknown time';
-            setBulkRevokeProgress(`Restoring ${i + 1} of ${count}: @${handle} (Created: ${createdAtStr})`);
+            setBulkRevokeProgress(`Uncanceling ${i + 1} of ${count}: @${handle} (Created: ${createdAtStr})`);
 
             try {
                 const parts = cancellationRecord.uri.split('/');
@@ -1150,26 +1150,26 @@ function Canceler() {
                 });
                 successCount++;
             } catch (error) {
-                console.error(`Failed to restore @${handle} (URI: ${cancellationRecord.uri}):`, error);
+                console.error(`Failed to uncancel @${handle} (URI: ${cancellationRecord.uri}):`, error);
                 failureCount++;
                 errors.push(`@${handle}: ${error.message || 'Unknown error'}`);
             }
         }
 
         // Final status message
-        let finalMessage = `Time-based restoration complete (${revokeTimeRange}). \n`;
-        finalMessage += `Successfully restored: ${successCount}. \n`;
+        let finalMessage = `Time-based uncancellation complete (${revokeTimeRange}). \n`;
+        finalMessage += `Successfully uncancelled: ${successCount}. \n`;
         if (failureCount > 0) {
             finalMessage += `Failed: ${failureCount}. \n`;
-            console.log("Time-based restoration errors:", errors);
+            console.log("Time-based uncancellation errors:", errors);
             finalMessage += `Check console for details on failures.`;
         }
         setBulkRevokeStatus(finalMessage);
         fetchVerifications(); // Refresh the list of canceled accounts displayed in UI
 
     } catch (error) {
-        console.error('Error during time-based restoration process:', error);
-        setBulkRevokeStatus(`Error during time-based restoration (${revokeTimeRange}): ${error.message || 'Unknown error'}`);
+        console.error('Error during time-based uncancellation process:', error);
+        setBulkRevokeStatus(`Error during time-based uncancellation (${revokeTimeRange}): ${error.message || 'Unknown error'}`);
     } finally {
         setIsRevoking(false);
         setBulkRevokeProgress('');
@@ -1519,7 +1519,7 @@ Check yours: https://cred.blue/canceler`;
                          required
                          className="canceler-list-select" 
                      >
-                         <option value="" disabled>{isFetchingLists ? "Loading lists..." : userLists.length === 0 ? "No lists found" : "-- Select list to restore --"}</option>
+                         <option value="" disabled>{isFetchingLists ? "Loading lists..." : userLists.length === 0 ? "No lists found" : "-- Select list to uncancel --"}</option>
                          {userLists.map(list => (
                          <option key={list.uri} value={list.uri}>
                              {list.name} ({list.listItemCount || 0} members)
@@ -1527,13 +1527,13 @@ Check yours: https://cred.blue/canceler`;
                          ))}
                      </select>
                      <button type="submit" disabled={isRevoking || !selectedListUriForRevoke || isFetchingLists} className="canceler-revoke-button"> {/* Reuse revoke button style */} 
-                         {isRevoking ? 'Restoring List...' : 'Restore Selected List'}
+                         {isRevoking ? 'Uncanceling List...' : 'Uncancel Selected List'}
                      </button>
                  </form>
              </div>
         ) : ( /* revokeMode === 'time' */
              <div className="canceler-time-revoke-wrapper">
-                <p>Select the time range to restore cancellations created within:</p>
+                <p>Select the time range to uncancel cancellations created within:</p>
                  <div className="canceler-time-range-selector">
                      <label>
                          <input type="radio" name="revokeTimeRange" value="30m" checked={revokeTimeRange === '30m'} onChange={(e) => setRevokeTimeRange(e.target.value)} disabled={isRevoking} />
@@ -1553,7 +1553,7 @@ Check yours: https://cred.blue/canceler`;
                     disabled={isRevoking || !revokeTimeRange}
                     className="canceler-revoke-button"
                  >
-                    {isRevoking ? 'Restoring by Time...' : 'Restore Selected Range'}
+                    {isRevoking ? 'Uncanceling by Time...' : 'Uncancel Selected Range'}
                  </button>
             </div>
         )}
@@ -1612,7 +1612,7 @@ function VerificationList({
                     </div>
                     <div className="canceler-list-item-actions">
                         <button onClick={() => handleRevoke(verification)} disabled={isRevoking || isLoading} className="canceler-revoke-button">
-                            {(isRevoking && revokeStatusMessage?.includes(verification.handle)) ? 'Restoring...' : 'Restore'} 
+                            {(isRevoking && revokeStatusMessage?.includes(verification.handle)) ? 'Uncancelling...' : 'Uncancel'} 
                         </button>
                     </div>
                 </li>

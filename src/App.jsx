@@ -22,6 +22,7 @@ import CollectionsFeed from './components/CollectionsFeed/CollectionsFeed';
 import Login from './components/Login/Login';
 import LoginCallback from './components/Login/LoginCallback';
 import Verifier from './components/Verifier/Verifier';
+import Canceler from './components/Canceler/Canceler';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import "./App.css";
@@ -57,6 +58,14 @@ const App = () => {
                   element={
                     <ProtectedRoute>
                       <Verifier />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/canceler" 
+                  element={
+                    <ProtectedRoute>
+                      <Canceler />
                     </ProtectedRoute>
                   } 
                 />

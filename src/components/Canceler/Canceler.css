@@ -1,0 +1,572 @@
+/* frontend-cred-blue/src/components/Verifier/Verifier.css */
+
+/* General container */
+.canceler-container {
+  font-family: "articulat-cf", sans-serif;
+  max-width: 450px; /* Adjust as needed */
+  margin: 20px auto;
+  padding: 20px;
+  color: var(--text);
+}
+
+.canceler-container h1,
+.canceler-container h2 {
+  color: var(--button-bg); /* Match heading color */
+  text-align: left;
+  margin-bottom: 15px;
+}
+
+.canceler-container h1 {
+  font-size: 2em; /* Adjust */
+}
+.canceler-intro-container {
+  margin-bottom: 20px;
+}
+
+/* Apply consistent styles ONLY to h2 elements within canceler sections */
+.canceler-section h2 {
+  margin-top: 0;
+}
+
+.canceler-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  flex-wrap: wrap; /* Allow wrapping on small screens */
+  gap: 10px;
+}
+
+.canceler-list {
+  margin-top: 10px;
+}
+
+.canceler-user-info {
+  font-size: 0.9em;
+  color: var(--text-muted, var(--text));
+  margin: 0; /* Remove default paragraph margin */
+}
+
+/* Buttons */
+.canceler-sign-out-button,
+.canceler-submit-button,
+.canceler-action-button,
+.canceler-revoke-button {
+  background: var(--button-bg);
+  color: var(--button-text);
+  border: none;
+  border-radius: 6px;
+  padding: 8px 15px; /* Slightly smaller padding */
+  font-weight: 700;
+  font-size: 0.9em;
+  margin: 0px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.canceler-sign-out-button:hover,
+.canceler-submit-button:hover,
+.canceler-action-button:hover,
+.canceler-revoke-button:hover {
+  background: var(--button-hover-bg, #0056b3); /* Use main hover color */
+}
+
+.canceler-sign-out-button:disabled,
+.canceler-submit-button:disabled,
+.canceler-action-button:disabled,
+.canceler-revoke-button:disabled {
+  background-color: var(--button-disabled-bg, #cccccc); /* Add disabled style */
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Form Styles */
+.canceler-section {
+  background: var(--navbar-bg);
+  border: 5px solid var(--card-border); /* Match alt-card border */
+  border-radius: 12px; /* Match alt-card radius */
+  box-shadow: none; /* Match alt-card shadow */
+  padding: 40px 30px; /* Keep increased padding or adjust if alt-card is different */
+  margin: 30px auto; /* Match alt-card margin */
+  max-width: 95%; /* Match alt-card max-width */
+  /* margin-bottom: 20px; */ /* Remove specific margin-bottom */
+}
+
+.canceler-input-container {
+  position: relative; /* Needed for autocomplete positioning */
+  max-width: 400px;
+  border: none; /* Remove any potential border */
+  outline: none; /* Remove outline on focus */
+  padding: 0; /* Remove padding if any was added */
+  margin: 0; /* Remove margin if any was added */
+}
+
+.canceler-form-container {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap; /* Allow wrapping */
+  padding: 0px;
+  border: 0px;
+  /* position: relative; */ /* Removed - no longer needed */
+}
+
+.canceler-input-field {
+  flex-grow: 1; /* Take available space */
+  border: 2px solid var(--card-border);
+  border-radius: 6px;
+  padding: 9px;
+  font-size: 1em;
+  background-color: var(--navbar-bg);
+  color: var(--text);
+  transition: all 0.3s ease;
+  font-family: inherit; /* Use main font */
+  min-width: 200px; /* Ensure minimum width */
+  margin: 0px;
+  text-align: left;
+}
+
+.canceler-input-field:hover,
+.canceler-input-field:focus {
+  border-color: var(--button-bg);
+  background-color: var(--background); /* Match main app focus */
+  outline: none;
+}
+
+/* Status Box */
+.canceler-status-box {
+  padding: 15px;
+  border-radius: 6px;
+  margin-top: 15px;
+  margin-bottom: 15px;
+  text-align: center;
+  border: 1px solid transparent; /* Base border */
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+.canceler-status-box-success {
+  background-color: var(--success-bg, #d4edda);
+  color: var(--success-text, #155724);
+  border-color: var(--success-border, #c3e6cb);
+}
+.canceler-status-box-error {
+  background-color: var(--error-bg, #f8d7da);
+  color: var(--error-text, #721c24);
+  border-color: var(--error-border, #f5c6cb);
+}
+.canceler-status-box .canceler-intent-link { /* Renamed class */
+  color: var(--success-text, #155724);
+  font-weight: bold;
+  text-decoration: underline;
+}
+
+.canceler-status-box p {
+  margin:
+0px;
+}
+
+/* Dark Mode Status Box Styles */
+.dark-mode .canceler-status-box-success {
+  background-color: var(--success-bg-dark, #1a3a24); /* Example dark variable */
+  color: var(--success-text-dark, #a3e9a4);
+  border-color: var(--success-border-dark, #2a5a34);
+}
+.dark-mode .canceler-status-box-error {
+  background-color: var(--error-bg-dark, #4d1f24); /* Example dark variable */
+  color: var(--error-text-dark, #f5c6cb);
+  border-color: var(--error-border-dark, #721c24);
+}
+.dark-mode .canceler-status-box .canceler-intent-link {
+  color: var(--success-text-dark, #a3e9a4);
+}
+
+.canceler-list-header h2 {
+  margin: 0;
+  padding: 0;
+  border-bottom: none; /* Explicitly remove border here */
+}
+
+.canceler-list {
+  list-style: none;
+  padding: 0;
+  margin: 0; /* Reset default ul margins */
+  margin-top: 15px;
+  width: 100%; /* Added */
+  box-sizing: border-box; /* Added */
+}
+
+.canceler-canceler-list {
+  margin: 0;
+  padding-left: 15px;
+  padding-top: 10px;
+}
+
+.canceler-list-item {
+  display: flex;
+  align-items: center;
+  background-color: var(--navbar-bg); /* Match form background */
+  padding: 15px;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap; /* Allow actions to wrap */
+  gap: 10px;
+  width: 100%; /* Added */
+  box-sizing: border-box; /* Added */
+}
+.canceler-list-item-content {
+  flex-grow: 1;
+}
+.canceler-list-item-handle {
+  font-size: 0.9em;
+  color: var(--text-muted, var(--text));
+  margin: 2px 0;
+}
+.canceler-list-item-date {
+  font-size: 0.8em;
+  color: var(--text-muted, var(--text));
+  margin-top: 5px;
+}
+
+.canceler-list-item-actions {
+  flex-shrink: 0; /* Prevent button shrinking */
+  margin-left: auto; /* Added to push button right */
+}
+
+.canceler-list-item-invalid {
+  border-left: 5px solid var(--warning-border, orange); /* Highlight invalid items */
+}
+
+/* New styles for verification list profile links */
+.canceler-profile-link {
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  color: var(--text);
+  margin-bottom: 5px;
+}
+
+.canceler-profile-link:hover {
+  text-decoration: underline;
+}
+
+.canceler-display-name {
+  font-weight: bold;
+  font-size: 1.05em;
+  margin-right: 5px;
+}
+
+/* Add dark mode color for display name */
+.dark-mode .canceler-display-name {
+  color: #3b9af8; /* Light blue for dark mode */
+}
+
+.canceler-network-results p {
+  margin: 0px;
+}
+
+/* Validity status indicators */
+.canceler-validity-status {
+  display: inline-block;
+  font-size: 0.9em;
+  padding: 3px 6px;
+  border-radius: 4px;
+  margin-top: 5px;
+}
+
+.canceler-list {
+  margin-top: 15px;
+}
+
+.canceler-validity-status.valid {
+  background-color: var(--success-bg, rgba(0, 128, 0, 0.1));
+  color: var(--success-text, green);
+}
+
+.canceler-validity-status.invalid {
+  background-color: var(--error-bg, rgba(255, 0, 0, 0.1));
+  color: var(--error-text, red);
+}
+
+.canceler-validity-status.checking {
+  background-color: var(--warning-bg, rgba(255, 165, 0, 0.1));
+  color: var(--warning-text, orange);
+}
+
+/* Dark mode compatibility */
+.dark-mode .canceler-validity-status.valid {
+  background-color: var(--success-bg-dark, rgba(0, 128, 0, 0.3));
+  color: var(--success-text-dark, #a3e9a4);
+}
+
+.dark-mode .canceler-validity-status.invalid {
+  background-color: var(--error-bg-dark, rgba(255, 0, 0, 0.2));
+  color: var(--error-text-dark, #f5c6cb);
+}
+
+.dark-mode .canceler-validity-status.checking {
+  background-color: var(--warning-bg-dark, rgba(255, 165, 0, 0.2));
+  color: var(--warning-text-dark, #ffe4b5);
+}
+
+/* Remove the now-unused validity warning box styles */
+.canceler-validity-warning {
+  display: none;
+}
+
+/* Media query for mobile optimization */
+@media (max-width: 480px) {
+  .canceler-list-item {
+    flex-direction: column;
+  }
+  
+  .canceler-list-item-content {
+    width: 100%;
+    margin-bottom: 10px;
+  }
+  
+  .canceler-list-item-actions {
+    align-self: flex-end;
+  }
+}
+
+/* Network Verifications */
+.canceler-check-network-button {
+  font-size: .9em;
+  margin: 0px;
+  margin-top: 16.4px;
+}
+
+.canceler-action-button.canceler-refresh-button {
+  margin: 0px;
+}
+
+.canceler-network-status {
+  font-style: italic;
+  color: var(--text-muted, var(--text));
+  margin: 10px 0;
+}
+.canceler-network-results {
+  margin-top: 0px;
+}
+
+.canceler-additional-context p {
+  margin-top: 0px;
+}
+
+.canceler-additional-context {
+  font-size: 0.9em;
+  color: var(--text-muted, var(--text));
+  margin-top: 15px;
+  border-top: 1px dashed var(--card-border);
+  padding-top: 17px;
+}
+.canceler-share-stats-link {
+  display: inline-block;
+  margin-top: 15px;
+  font-size: 0.9em;
+  font-weight: bold;
+}
+
+.canceler-official-canceler-note {
+  font-size: 0.9em;
+  margin: 5px 0;
+  padding-left: 5px; /* Indent slightly */
+}
+
+.canceler-network-results {
+  margin-top: 20px;
+}
+
+.canceler-verified-status { color: var(--success-text, green); }
+.canceler-not-verified-status { color: var(--text-muted, grey); }
+.canceler-error-status { color: var(--error-text, red); }
+.canceler-checking-status, .canceler-idle-status { color: var(--text-muted, grey); }
+
+/* Styles for Typeahead/Autocomplete Suggestions */
+.canceler-input-wrapper {
+  position: relative; /* Required for absolute positioning of suggestions */
+}
+
+.canceler-suggestions-list {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0px 0px 0px;
+  position: absolute;
+  top: 100%; /* Position below the input */
+  left: 0;
+  right: 0;
+  background-color: var(--navbar-bg); /* Match nearby elements */
+  border: 2px solid var(--card-border);
+  border-radius: 6px; /* Round bottom corners */
+  max-height: 275px; /* Limit height and allow scroll */
+  overflow: clip;
+  z-index: 1000; /* Ensure it appears above other content */
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.canceler-suggestion-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 15px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.canceler-suggestion-item.loading,
+.canceler-suggestion-item.none {
+  font-style: italic;
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.canceler-suggestion-item:hover.loading,
+.canceler-suggestion-item:hover.none {
+  background-color: transparent; /* Don't highlight loading/none items */
+  color: var(--text-muted);
+}
+
+.canceler-suggestion-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  margin-right: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.canceler-suggestion-text {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Prevent long text overflow */
+  white-space: nowrap;
+}
+
+.canceler-suggestion-name {
+  font-weight: bold;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.canceler-suggestion-handle {
+  font-size: 0.9em;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+/* Styles for List Verification */
+.canceler-mode-toggle {
+  display: flex;
+  gap: 20px; /* Space between radio buttons */
+  margin-bottom: 15px; /* Space below the toggle */
+  margin-top: 15px;
+  padding-bottom: 15px; /* More space */
+  border-bottom: 1px solid var(--card-border); /* Separator line */
+}
+
+.canceler-mode-toggle label {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px; /* Space between radio and text */
+  color: var(--text);
+}
+
+.canceler-mode-toggle input[type="radio"] {
+  cursor: pointer;
+  /* Optional: style the radio button itself */
+}
+
+.canceler-list-select {
+  flex-grow: 1; /* Take available space */
+  border: 2px solid var(--card-border);
+  border-radius: 6px;
+  padding: 9px;
+  font-size: 1em;
+  background-color: var(--navbar-bg);
+  color: var(--text);
+  transition: all 0.3s ease;
+  font-family: inherit; /* Use main font */
+  min-width: 200px; /* Ensure minimum width */
+  margin: 0px;
+  max-width: 100%;
+}
+
+.canceler-list-select:hover,
+.canceler-list-select:focus {
+  border-color: var(--button-bg);
+  background-color: var(--background); /* Match main app focus */
+  outline: none;
+}
+
+.canceler-list-select:disabled {
+  background-color: var(--button-disabled-bg, #cccccc);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Progress Indicator */
+.canceler-status-box-progress p {
+  margin: 0; /* Reset margin for progress text */
+  font-style: italic;
+}
+
+.canceler-bulk-progress {
+  font-style: italic;
+  color: var(--text-muted, var(--text));
+  margin-top: 8px;
+  font-size: 0.9em;
+}
+
+/* Verification Options */
+.canceler-options {
+  margin-bottom: 15px;
+  margin-top: 10px; /* Added margin top */
+}
+
+.canceler-options label {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text);
+  font-size: 0.9em;
+}
+
+.canceler-options input[type="checkbox"] {
+  cursor: pointer;
+  margin-right: 5px; /* Space between checkbox and label text */
+}
+
+
+/* Time-based Revocation Styles */
+.canceler-time-revoke-wrapper {
+  margin-top: 15px;
+}
+
+.canceler-time-revoke-wrapper p {
+  margin-bottom: 10px;
+  color: var(--text);
+}
+
+.canceler-time-range-selector {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 15px;
+  flex-wrap: wrap; /* Allow wrapping */
+}
+
+.canceler-time-range-selector label {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text);
+}
+
+.canceler-time-range-selector input[type="radio"] {
+  cursor: pointer;
+}
+
+.canceler-time-revoke-wrapper .canceler-revoke-button {
+  /* Optional: Specific styling if needed, otherwise inherits from .canceler-revoke-button */
+}

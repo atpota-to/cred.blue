@@ -7,7 +7,7 @@ const Terms = () => {
       <main className="privacy-terms-page">
         <div className="alt-card">
           <h1>Terms of Service</h1>
-          <div className="last-updated">Last Updated: February 19, 2025</div>
+          <div className="last-updated">Last Updated: May 15, 2025</div>
 
           <div className="section">
             <h2>1. Acceptance of Terms</h2>
@@ -48,16 +48,7 @@ const Terms = () => {
           </div>
 
           <div className="section">
-            <h2>5. Intellectual Property</h2>
-            <ul>
-              <li>All content, features, and functionality are owned by cred.blue</li>
-              <li>The Service's scoring system and algorithms are proprietary</li>
-              <li>Users may not reproduce, distribute, or create derivative works without permission</li>
-            </ul>
-          </div>
-
-          <div className="section">
-            <h2>6. Account Terms</h2>
+            <h2>5. Account Terms</h2>
             <ul>
               <li>Authentication is handled through Bluesky's system</li>
               <li>You are responsible for maintaining the security of your Bluesky credentials</li>
@@ -66,7 +57,7 @@ const Terms = () => {
           </div>
 
           <div className="section">
-            <h2>7. Disclaimer of Warranties</h2>
+            <h2>6. Disclaimer of Warranties</h2>
             <ul>
               <li>The Service is provided "as is" without warranties of any kind</li>
               <li>We do not guarantee the accuracy of scores or analytics</li>
@@ -76,7 +67,7 @@ const Terms = () => {
           </div>
 
           <div className="section">
-            <h2>8. Limitation of Liability</h2>
+            <h2>7. Limitation of Liability</h2>
             <p>We shall not be liable for:</p>
             <ul>
               <li>Any indirect, incidental, or consequential damages</li>
@@ -87,7 +78,7 @@ const Terms = () => {
           </div>
 
           <div className="section">
-            <h2>9. Modifications to Service</h2>
+            <h2>8. Modifications to Service</h2>
             <p>We reserve the right to:</p>
             <ul>
               <li>Modify or discontinue any part of the Service</li>
@@ -98,7 +89,7 @@ const Terms = () => {
           </div>
 
           <div className="contact">
-            <h2>10. Contact Information</h2>
+            <h2>9. Contact Information</h2>
             <p>For questions about these Terms, please contact us at terms@cred.blue</p>
           </div>
         </div>

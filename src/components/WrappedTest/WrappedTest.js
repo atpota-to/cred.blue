@@ -350,6 +350,70 @@ const WrappedTest = () => {
             </div>
           ))}
         </div>
+
+        {/* Top Emojis */}
+        {analysis.topEmojis && analysis.topEmojis.length > 0 && (
+          <>
+            <h4>Top 10 Emojis</h4>
+            <div className="top-items-grid">
+              {analysis.topEmojis.map((item, idx) => (
+                <div key={idx} className="top-item-card">
+                  <div className="top-item-rank">#{idx + 1}</div>
+                  <div className="top-item-emoji">{item.emoji}</div>
+                  <div className="top-item-count">{item.count} uses</div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Top Mentions */}
+        {analysis.topMentions && analysis.topMentions.length > 0 && (
+          <>
+            <h4>Top 10 Mentioned Users</h4>
+            <div className="top-mentions-list">
+              {analysis.topMentions.map((item, idx) => (
+                <div key={idx} className="top-mention-item">
+                  <div className="mention-rank">#{idx + 1}</div>
+                  <div className="mention-did">{item.did}</div>
+                  <div className="mention-count">{item.count} mentions</div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Other Collections Breakdown */}
+        {analysis.otherCollections && Object.keys(analysis.otherCollections).length > 0 && (
+          <>
+            <h4>Other Collections Breakdown</h4>
+            <div className="other-collections-breakdown">
+              {Object.entries(analysis.otherCollections)
+                .sort((a, b) => b[1].count - a[1].count)
+                .map(([type, data], idx) => (
+                  <div key={idx} className="other-collection-card">
+                    <div className="other-collection-header">
+                      <span className="other-collection-type">{type}</span>
+                      <span className="other-collection-count">{data.count} records</span>
+                    </div>
+                    {data.samples.length > 0 && (
+                      <details className="other-collection-samples">
+                        <summary>View {data.samples.length} sample(s)</summary>
+                        <div className="samples-container">
+                          {data.samples.map((sample, sIdx) => (
+                            <div key={sIdx} className="sample-card">
+                              <div className="sample-header">Sample {sIdx + 1}</div>
+                              <pre className="sample-json">{JSON.stringify(sample, null, 2)}</pre>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                  </div>
+                ))}
+            </div>
+          </>
+        )}
       </div>
     );
   };

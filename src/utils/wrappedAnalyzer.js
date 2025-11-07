@@ -39,7 +39,16 @@ export function analyzeWrappedData(records, did) {
     growth: analyzeGrowth(records),
     
     // Fun facts
-    funFacts: generateFunFacts(records)
+    funFacts: generateFunFacts(records),
+    
+    // Top mentions
+    topMentions: extractMentions(records),
+    
+    // Top emojis
+    topEmojis: extractEmojis(records),
+    
+    // Other collections breakdown
+    otherCollections: analyzeOtherCollections(records)
   };
 
   const analysisTime = performance.now() - startTime;
@@ -345,6 +354,100 @@ function calculatePercentChange(oldVal, newVal) {
 }
 
 /**
+ * Common words to filter out (stop words)
+ */
+const STOP_WORDS = new Set([
+  'the', 'be', 'to', 'of', 'and', 'a', 'in', 'that', 'have', 'i', 'it', 'for',
+  'not', 'on', 'with', 'he', 'as', 'you', 'do', 'at', 'this', 'but', 'his',
+  'by', 'from', 'they', 'we', 'say', 'her', 'she', 'or', 'an', 'will', 'my',
+  'one', 'all', 'would', 'there', 'their', 'what', 'so', 'up', 'out', 'if',
+  'about', 'who', 'get', 'which', 'go', 'me', 'when', 'make', 'can', 'like',
+  'time', 'no', 'just', 'him', 'know', 'take', 'people', 'into', 'year',
+  'your', 'good', 'some', 'could', 'them', 'see', 'other', 'than', 'then',
+  'now', 'look', 'only', 'come', 'its', 'over', 'think', 'also', 'back',
+  'after', 'use', 'two', 'how', 'our', 'work', 'first', 'well', 'way', 'even',
+  'new', 'want', 'because', 'any', 'these', 'give', 'day', 'most', 'us', 'is',
+  'was', 'are', 'been', 'has', 'had', 'were', 'said', 'did', 'having', 'may',
+  'should', 'does', 'being', 'am', 'much', 'more', 'very', 'too', 'really',
+  'dont', 'doesnt', 'didnt', 'wasnt', 'werent', 'isnt', 'arent', 'cant', 'wont',
+  'wouldnt', 'shouldnt', 'couldnt', 'im', 'ive', 'youre', 'youve', 'thats',
+  'theres', 'hes', 'shes', 'its', 'were', 'theyre', 'theyve'
+]);
+
+/**
+ * Extract mentions from posts
+ */
+function extractMentions(records) {
+  const mentionCounts = {};
+  
+  records.posts.forEach(post => {
+    if (post.facets) {
+      post.facets.forEach(facet => {
+        if (facet.features) {
+          facet.features.forEach(feature => {
+            if (feature.$type === 'app.bsky.richtext.facet#mention' && feature.did) {
+              mentionCounts[feature.did] = (mentionCounts[feature.did] || 0) + 1;
+            }
+          });
+        }
+      });
+    }
+  });
+  
+  return Object.entries(mentionCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([did, count]) => ({ did, count }));
+}
+
+/**
+ * Extract emojis from posts
+ */
+function extractEmojis(records) {
+  const emojiRegex = /[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu;
+  const emojiCounts = {};
+  
+  records.posts.forEach(post => {
+    if (post.text) {
+      const emojis = post.text.match(emojiRegex);
+      if (emojis) {
+        emojis.forEach(emoji => {
+          emojiCounts[emoji] = (emojiCounts[emoji] || 0) + 1;
+        });
+      }
+    }
+  });
+  
+  return Object.entries(emojiCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([emoji, count]) => ({ emoji, count }));
+}
+
+/**
+ * Analyze "Other" collections in detail
+ */
+function analyzeOtherCollections(records) {
+  const collectionBreakdown = {};
+  
+  records.other.forEach(record => {
+    const type = record.type || record.$type || 'unknown';
+    if (!collectionBreakdown[type]) {
+      collectionBreakdown[type] = {
+        count: 0,
+        samples: []
+      };
+    }
+    collectionBreakdown[type].count++;
+    if (collectionBreakdown[type].samples.length < 3) {
+      collectionBreakdown[type].samples.push(record);
+    }
+  });
+  
+  return collectionBreakdown;
+}
+
+/**
  * Generate fun facts and interesting insights
  */
 function generateFunFacts(records) {
@@ -401,14 +504,14 @@ function generateFunFacts(records) {
     : 0;
   facts.push(`You give ${likeToPostRatio} likes for every post you make`);
   
-  // Most used words (simple implementation)
+  // Most used meaningful words (filtered)
   const wordFreq = {};
   records.posts.forEach(post => {
     if (post.text) {
       const words = post.text.toLowerCase()
         .replace(/[^\w\s]/g, '')
         .split(/\s+/)
-        .filter(w => w.length > 3); // Only words longer than 3 chars
+        .filter(w => w.length > 3 && !STOP_WORDS.has(w));
       
       words.forEach(word => {
         wordFreq[word] = (wordFreq[word] || 0) + 1;
@@ -423,6 +526,18 @@ function generateFunFacts(records) {
   
   if (topWords.length > 0) {
     facts.push(`Your most used words: ${topWords.join(', ')}`);
+  }
+  
+  // Top emoji
+  const topEmojis = extractEmojis(records);
+  if (topEmojis.length > 0) {
+    facts.push(`Your favorite emoji: ${topEmojis[0].emoji} (used ${topEmojis[0].count} times)`);
+  }
+  
+  // Top mentions
+  const topMentions = extractMentions(records);
+  if (topMentions.length > 0) {
+    facts.push(`You've mentioned ${topMentions.length} different users`);
   }
   
   return facts;

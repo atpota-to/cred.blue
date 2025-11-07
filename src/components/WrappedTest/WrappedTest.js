@@ -14,6 +14,55 @@ const WrappedTest = () => {
   const [repoData, setRepoData] = useState(null);
   const [analysis, setAnalysis] = useState(null);
   const [selectedTab, setSelectedTab] = useState('overview');
+  const [didHandleMap, setDidHandleMap] = useState({});
+
+  // Function to resolve a DID to a handle
+  const resolveDidToHandle = async (did) => {
+    try {
+      const response = await fetch(`https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor=${did}`);
+      if (response.ok) {
+        const data = await response.json();
+        return data.handle || did;
+      }
+    } catch (err) {
+      console.error(`Failed to resolve DID ${did}:`, err);
+    }
+    return did; // Return DID if resolution fails
+  };
+
+  // Function to resolve multiple DIDs to handles
+  const resolveDidsToHandles = async (dids) => {
+    const newHandleMap = { ...didHandleMap };
+    const didsToResolve = dids.filter(did => !newHandleMap[did]);
+    
+    if (didsToResolve.length === 0) return;
+
+    console.log(`Resolving ${didsToResolve.length} DIDs to handles...`);
+    
+    // Resolve in batches to avoid overwhelming the API
+    const batchSize = 10;
+    for (let i = 0; i < didsToResolve.length; i += batchSize) {
+      const batch = didsToResolve.slice(i, i + batchSize);
+      const results = await Promise.all(
+        batch.map(async (did) => {
+          const handle = await resolveDidToHandle(did);
+          return [did, handle];
+        })
+      );
+      
+      results.forEach(([did, handle]) => {
+        newHandleMap[did] = handle;
+      });
+      
+      // Update state after each batch
+      setDidHandleMap({ ...newHandleMap });
+      
+      // Small delay between batches
+      if (i + batchSize < didsToResolve.length) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
+  };
 
   const handleFetch = async () => {
     setLoading(true);
@@ -45,6 +94,35 @@ const WrappedTest = () => {
       const wrappedAnalysis = analyzeWrappedData(data.records, did);
       setAnalysis(wrappedAnalysis);
       console.log('Analysis complete:', wrappedAnalysis);
+
+      // Collect all DIDs from interactions for resolution
+      if (wrappedAnalysis.interactions) {
+        const allDids = new Set();
+        
+        if (wrappedAnalysis.interactions.topOverall) {
+          wrappedAnalysis.interactions.topOverall.forEach(item => allDids.add(item.did));
+        }
+        if (wrappedAnalysis.interactions.topMentions) {
+          wrappedAnalysis.interactions.topMentions.forEach(item => allDids.add(item.did));
+        }
+        if (wrappedAnalysis.interactions.topReplies) {
+          wrappedAnalysis.interactions.topReplies.forEach(item => allDids.add(item.did));
+        }
+        if (wrappedAnalysis.interactions.topLikes) {
+          wrappedAnalysis.interactions.topLikes.forEach(item => allDids.add(item.did));
+        }
+        if (wrappedAnalysis.interactions.topReposts) {
+          wrappedAnalysis.interactions.topReposts.forEach(item => allDids.add(item.did));
+        }
+        if (wrappedAnalysis.interactions.topQuotes) {
+          wrappedAnalysis.interactions.topQuotes.forEach(item => allDids.add(item.did));
+        }
+        
+        // Resolve DIDs to handles
+        if (allDids.size > 0) {
+          resolveDidsToHandles(Array.from(allDids));
+        }
+      }
     } catch (err) {
       console.error('Error fetching repo data:', err);
       setError(err.message || 'Failed to fetch repo data');
@@ -408,7 +486,16 @@ const WrappedTest = () => {
                   {analysis.interactions.topOverall.map((item, idx) => (
                     <div key={idx} className="top-mention-item">
                       <div className="mention-rank">#{idx + 1}</div>
-                      <div className="mention-did">{item.did}</div>
+                      <div className="mention-info">
+                        {didHandleMap[item.did] ? (
+                          <>
+                            <div className="mention-handle">@{didHandleMap[item.did]}</div>
+                            <div className="mention-did-small">{item.did}</div>
+                          </>
+                        ) : (
+                          <div className="mention-did">{item.did}</div>
+                        )}
+                      </div>
                       <div className="mention-count">{item.count} interactions</div>
                     </div>
                   ))}
@@ -424,7 +511,16 @@ const WrappedTest = () => {
                   {analysis.interactions.topMentions.map((item, idx) => (
                     <div key={idx} className="top-mention-item">
                       <div className="mention-rank">#{idx + 1}</div>
-                      <div className="mention-did">{item.did}</div>
+                      <div className="mention-info">
+                        {didHandleMap[item.did] ? (
+                          <>
+                            <div className="mention-handle">@{didHandleMap[item.did]}</div>
+                            <div className="mention-did-small">{item.did}</div>
+                          </>
+                        ) : (
+                          <div className="mention-did">{item.did}</div>
+                        )}
+                      </div>
                       <div className="mention-count">{item.count} mentions</div>
                     </div>
                   ))}
@@ -440,7 +536,16 @@ const WrappedTest = () => {
                   {analysis.interactions.topReplies.map((item, idx) => (
                     <div key={idx} className="top-mention-item">
                       <div className="mention-rank">#{idx + 1}</div>
-                      <div className="mention-did">{item.did}</div>
+                      <div className="mention-info">
+                        {didHandleMap[item.did] ? (
+                          <>
+                            <div className="mention-handle">@{didHandleMap[item.did]}</div>
+                            <div className="mention-did-small">{item.did}</div>
+                          </>
+                        ) : (
+                          <div className="mention-did">{item.did}</div>
+                        )}
+                      </div>
                       <div className="mention-count">{item.count} replies</div>
                     </div>
                   ))}
@@ -456,7 +561,16 @@ const WrappedTest = () => {
                   {analysis.interactions.topLikes.map((item, idx) => (
                     <div key={idx} className="top-mention-item">
                       <div className="mention-rank">#{idx + 1}</div>
-                      <div className="mention-did">{item.did}</div>
+                      <div className="mention-info">
+                        {didHandleMap[item.did] ? (
+                          <>
+                            <div className="mention-handle">@{didHandleMap[item.did]}</div>
+                            <div className="mention-did-small">{item.did}</div>
+                          </>
+                        ) : (
+                          <div className="mention-did">{item.did}</div>
+                        )}
+                      </div>
                       <div className="mention-count">{item.count} likes</div>
                     </div>
                   ))}
@@ -472,7 +586,16 @@ const WrappedTest = () => {
                   {analysis.interactions.topReposts.map((item, idx) => (
                     <div key={idx} className="top-mention-item">
                       <div className="mention-rank">#{idx + 1}</div>
-                      <div className="mention-did">{item.did}</div>
+                      <div className="mention-info">
+                        {didHandleMap[item.did] ? (
+                          <>
+                            <div className="mention-handle">@{didHandleMap[item.did]}</div>
+                            <div className="mention-did-small">{item.did}</div>
+                          </>
+                        ) : (
+                          <div className="mention-did">{item.did}</div>
+                        )}
+                      </div>
                       <div className="mention-count">{item.count} reposts</div>
                     </div>
                   ))}
@@ -488,7 +611,16 @@ const WrappedTest = () => {
                   {analysis.interactions.topQuotes.map((item, idx) => (
                     <div key={idx} className="top-mention-item">
                       <div className="mention-rank">#{idx + 1}</div>
-                      <div className="mention-did">{item.did}</div>
+                      <div className="mention-info">
+                        {didHandleMap[item.did] ? (
+                          <>
+                            <div className="mention-handle">@{didHandleMap[item.did]}</div>
+                            <div className="mention-did-small">{item.did}</div>
+                          </>
+                        ) : (
+                          <div className="mention-did">{item.did}</div>
+                        )}
+                      </div>
                       <div className="mention-count">{item.count} quotes</div>
                     </div>
                   ))}

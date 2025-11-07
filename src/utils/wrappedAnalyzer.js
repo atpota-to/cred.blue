@@ -41,8 +41,8 @@ export function analyzeWrappedData(records, did) {
     // Fun facts
     funFacts: generateFunFacts(records),
     
-    // Top mentions
-    topMentions: extractMentions(records),
+    // Comprehensive interaction analysis
+    interactions: analyzeInteractions(records, did),
     
     // Top emojis
     topEmojis: extractEmojis(records),
@@ -375,29 +375,151 @@ const STOP_WORDS = new Set([
 ]);
 
 /**
- * Extract mentions from posts
+ * Extract DID from AT URI
+ * @param {string} uri - AT URI (e.g., "at://did:plc:xxx/app.bsky.feed.post/xxx")
+ * @returns {string|null} The DID or null
  */
-function extractMentions(records) {
-  const mentionCounts = {};
-  
+function extractDidFromUri(uri) {
+  if (!uri) return null;
+  const match = uri.match(/at:\/\/(did:[^\/]+)/);
+  return match ? match[1] : null;
+}
+
+/**
+ * Analyze all user interactions (mentions, replies, likes, reposts, quotes)
+ * @param {Object} records - All records
+ * @param {string} userDid - The user's own DID to filter out self-interactions
+ * @returns {Object} Detailed interaction breakdown
+ */
+function analyzeInteractions(records, userDid) {
+  console.log('Analyzing interactions for DID:', userDid);
+  console.log('Records counts:', {
+    posts: records.posts.length,
+    likes: records.likes.length,
+    reposts: records.reposts.length
+  });
+
+  const interactions = {
+    mentions: {},      // Explicit @mentions in posts
+    replies: {},       // Replies to other users
+    likes: {},         // Likes of other users' posts
+    reposts: {},       // Reposts of other users' posts
+    quotes: {},        // Quote posts of other users
+    overall: {}        // Combined count
+  };
+
+  // Track explicit mentions
   records.posts.forEach(post => {
-    if (post.facets) {
+    if (post.facets && post.facets.length > 0) {
       post.facets.forEach(facet => {
         if (facet.features) {
           facet.features.forEach(feature => {
             if (feature.$type === 'app.bsky.richtext.facet#mention' && feature.did) {
-              mentionCounts[feature.did] = (mentionCounts[feature.did] || 0) + 1;
+              const did = feature.did;
+              if (did !== userDid) {
+                interactions.mentions[did] = (interactions.mentions[did] || 0) + 1;
+                interactions.overall[did] = (interactions.overall[did] || 0) + 1;
+              }
             }
           });
         }
       });
     }
+
+    // Track replies (from reply.parent or reply.root)
+    if (post.reply) {
+      const parentDid = extractDidFromUri(post.reply.parent?.uri);
+      const rootDid = extractDidFromUri(post.reply.root?.uri);
+      
+      if (parentDid && parentDid !== userDid) {
+        interactions.replies[parentDid] = (interactions.replies[parentDid] || 0) + 1;
+        interactions.overall[parentDid] = (interactions.overall[parentDid] || 0) + 1;
+      }
+      
+      // Also count root if different from parent and not self
+      if (rootDid && rootDid !== userDid && rootDid !== parentDid) {
+        interactions.replies[rootDid] = (interactions.replies[rootDid] || 0) + 1;
+        interactions.overall[rootDid] = (interactions.overall[rootDid] || 0) + 1;
+      }
+    }
+
+    // Track quote posts (embed.record)
+    if (post.embed && post.embed.$type === 'app.bsky.embed.record' && post.embed.record) {
+      const quotedDid = extractDidFromUri(post.embed.record.uri);
+      if (quotedDid && quotedDid !== userDid) {
+        interactions.quotes[quotedDid] = (interactions.quotes[quotedDid] || 0) + 1;
+        interactions.overall[quotedDid] = (interactions.overall[quotedDid] || 0) + 1;
+      }
+    }
+    
+    // Also check for recordWithMedia (quote with media)
+    if (post.embed && post.embed.$type === 'app.bsky.embed.recordWithMedia' && post.embed.record?.record) {
+      const quotedDid = extractDidFromUri(post.embed.record.record.uri);
+      if (quotedDid && quotedDid !== userDid) {
+        interactions.quotes[quotedDid] = (interactions.quotes[quotedDid] || 0) + 1;
+        interactions.overall[quotedDid] = (interactions.overall[quotedDid] || 0) + 1;
+      }
+    }
   });
-  
-  return Object.entries(mentionCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
-    .map(([did, count]) => ({ did, count }));
+
+  // Track likes
+  records.likes.forEach(like => {
+    if (like.subject && like.subject.uri) {
+      const likedDid = extractDidFromUri(like.subject.uri);
+      if (likedDid && likedDid !== userDid) {
+        interactions.likes[likedDid] = (interactions.likes[likedDid] || 0) + 1;
+        interactions.overall[likedDid] = (interactions.overall[likedDid] || 0) + 1;
+      }
+    }
+  });
+
+  // Track reposts
+  records.reposts.forEach(repost => {
+    if (repost.subject && repost.subject.uri) {
+      const repostedDid = extractDidFromUri(repost.subject.uri);
+      if (repostedDid && repostedDid !== userDid) {
+        interactions.reposts[repostedDid] = (interactions.reposts[repostedDid] || 0) + 1;
+        interactions.overall[repostedDid] = (interactions.overall[repostedDid] || 0) + 1;
+      }
+    }
+  });
+
+  // Convert to sorted arrays
+  const sortAndSlice = (obj, limit = 10) => {
+    return Object.entries(obj)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit)
+      .map(([did, count]) => ({ did, count }));
+  };
+
+  const result = {
+    topMentions: sortAndSlice(interactions.mentions),
+    topReplies: sortAndSlice(interactions.replies),
+    topLikes: sortAndSlice(interactions.likes),
+    topReposts: sortAndSlice(interactions.reposts),
+    topQuotes: sortAndSlice(interactions.quotes),
+    topOverall: sortAndSlice(interactions.overall),
+    stats: {
+      totalMentions: Object.keys(interactions.mentions).length,
+      totalRepliedTo: Object.keys(interactions.replies).length,
+      totalLiked: Object.keys(interactions.likes).length,
+      totalReposted: Object.keys(interactions.reposts).length,
+      totalQuoted: Object.keys(interactions.quotes).length,
+      totalUnique: Object.keys(interactions.overall).length
+    }
+  };
+
+  console.log('Interaction analysis results:', {
+    mentions: result.topMentions.length,
+    replies: result.topReplies.length,
+    likes: result.topLikes.length,
+    reposts: result.topReposts.length,
+    quotes: result.topQuotes.length,
+    overall: result.topOverall.length,
+    stats: result.stats
+  });
+
+  return result;
 }
 
 /**
@@ -532,12 +654,6 @@ function generateFunFacts(records) {
   const topEmojis = extractEmojis(records);
   if (topEmojis.length > 0) {
     facts.push(`Your favorite emoji: ${topEmojis[0].emoji} (used ${topEmojis[0].count} times)`);
-  }
-  
-  // Top mentions
-  const topMentions = extractMentions(records);
-  if (topMentions.length > 0) {
-    facts.push(`You've mentioned ${topMentions.length} different users`);
   }
   
   return facts;

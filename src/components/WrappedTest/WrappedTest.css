@@ -524,12 +524,51 @@
   font-weight: 600;
 }
 
+/* Interaction Stats Summary */
+.interaction-stats-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 15px;
+  margin-bottom: 30px;
+  padding: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.interaction-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.interaction-stat-label {
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+.interaction-stat-value {
+  font-size: 1.8rem;
+  font-weight: bold;
+}
+
+/* Interaction Sections */
+.interaction-section {
+  margin-bottom: 30px;
+}
+
+.interaction-section h5 {
+  font-size: 1.2rem;
+  color: #333;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #667eea;
+}
+
 /* Top Mentions List */
 .top-mentions-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-bottom: 30px;
 }
 
 .top-mention-item {
@@ -539,6 +578,11 @@
   padding: 15px;
   background: #f8f9fa;
   border-left: 4px solid #667eea;
+  transition: transform 0.2s;
+}
+
+.top-mention-item:hover {
+  transform: translateX(5px);
 }
 
 .mention-rank {

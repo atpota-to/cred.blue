@@ -367,19 +367,134 @@ const WrappedTest = () => {
           </>
         )}
 
-        {/* Top Mentions */}
-        {analysis.topMentions && analysis.topMentions.length > 0 && (
+        {/* User Interactions */}
+        {analysis.interactions && (
           <>
-            <h4>Top 10 Mentioned Users</h4>
-            <div className="top-mentions-list">
-              {analysis.topMentions.map((item, idx) => (
-                <div key={idx} className="top-mention-item">
-                  <div className="mention-rank">#{idx + 1}</div>
-                  <div className="mention-did">{item.did}</div>
-                  <div className="mention-count">{item.count} mentions</div>
-                </div>
-              ))}
+            <h4>User Interactions</h4>
+            
+            {/* Interaction Stats Summary */}
+            <div className="interaction-stats-summary">
+              <div className="interaction-stat">
+                <span className="interaction-stat-label">Unique Users Interacted With:</span>
+                <span className="interaction-stat-value">{analysis.interactions.stats.totalUnique}</span>
+              </div>
+              <div className="interaction-stat">
+                <span className="interaction-stat-label">Users Mentioned:</span>
+                <span className="interaction-stat-value">{analysis.interactions.stats.totalMentions}</span>
+              </div>
+              <div className="interaction-stat">
+                <span className="interaction-stat-label">Users Replied To:</span>
+                <span className="interaction-stat-value">{analysis.interactions.stats.totalRepliedTo}</span>
+              </div>
+              <div className="interaction-stat">
+                <span className="interaction-stat-label">Users Liked:</span>
+                <span className="interaction-stat-value">{analysis.interactions.stats.totalLiked}</span>
+              </div>
+              <div className="interaction-stat">
+                <span className="interaction-stat-label">Users Reposted:</span>
+                <span className="interaction-stat-value">{analysis.interactions.stats.totalReposted}</span>
+              </div>
+              <div className="interaction-stat">
+                <span className="interaction-stat-label">Users Quoted:</span>
+                <span className="interaction-stat-value">{analysis.interactions.stats.totalQuoted}</span>
+              </div>
             </div>
+
+            {/* Top Overall Interactions */}
+            {analysis.interactions.topOverall && analysis.interactions.topOverall.length > 0 && (
+              <div className="interaction-section">
+                <h5>🌟 Top 10 Most Interacted With (Overall)</h5>
+                <div className="top-mentions-list">
+                  {analysis.interactions.topOverall.map((item, idx) => (
+                    <div key={idx} className="top-mention-item">
+                      <div className="mention-rank">#{idx + 1}</div>
+                      <div className="mention-did">{item.did}</div>
+                      <div className="mention-count">{item.count} interactions</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Top Mentions */}
+            {analysis.interactions.topMentions && analysis.interactions.topMentions.length > 0 && (
+              <div className="interaction-section">
+                <h5>💬 Top 10 Mentioned Users</h5>
+                <div className="top-mentions-list">
+                  {analysis.interactions.topMentions.map((item, idx) => (
+                    <div key={idx} className="top-mention-item">
+                      <div className="mention-rank">#{idx + 1}</div>
+                      <div className="mention-did">{item.did}</div>
+                      <div className="mention-count">{item.count} mentions</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Top Replies */}
+            {analysis.interactions.topReplies && analysis.interactions.topReplies.length > 0 && (
+              <div className="interaction-section">
+                <h5>↩️ Top 10 Replied To</h5>
+                <div className="top-mentions-list">
+                  {analysis.interactions.topReplies.map((item, idx) => (
+                    <div key={idx} className="top-mention-item">
+                      <div className="mention-rank">#{idx + 1}</div>
+                      <div className="mention-did">{item.did}</div>
+                      <div className="mention-count">{item.count} replies</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Top Likes */}
+            {analysis.interactions.topLikes && analysis.interactions.topLikes.length > 0 && (
+              <div className="interaction-section">
+                <h5>❤️ Top 10 Liked Users</h5>
+                <div className="top-mentions-list">
+                  {analysis.interactions.topLikes.map((item, idx) => (
+                    <div key={idx} className="top-mention-item">
+                      <div className="mention-rank">#{idx + 1}</div>
+                      <div className="mention-did">{item.did}</div>
+                      <div className="mention-count">{item.count} likes</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Top Reposts */}
+            {analysis.interactions.topReposts && analysis.interactions.topReposts.length > 0 && (
+              <div className="interaction-section">
+                <h5>🔄 Top 10 Reposted Users</h5>
+                <div className="top-mentions-list">
+                  {analysis.interactions.topReposts.map((item, idx) => (
+                    <div key={idx} className="top-mention-item">
+                      <div className="mention-rank">#{idx + 1}</div>
+                      <div className="mention-did">{item.did}</div>
+                      <div className="mention-count">{item.count} reposts</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Top Quotes */}
+            {analysis.interactions.topQuotes && analysis.interactions.topQuotes.length > 0 && (
+              <div className="interaction-section">
+                <h5>💭 Top 10 Quoted Users</h5>
+                <div className="top-mentions-list">
+                  {analysis.interactions.topQuotes.map((item, idx) => (
+                    <div key={idx} className="top-mention-item">
+                      <div className="mention-rank">#{idx + 1}</div>
+                      <div className="mention-did">{item.did}</div>
+                      <div className="mention-count">{item.count} quotes</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </>
         )}
 

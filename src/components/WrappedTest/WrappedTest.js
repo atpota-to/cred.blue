@@ -56,6 +56,21 @@ const WrappedTest = () => {
   const renderOverview = () => {
     if (!repoData) return null;
 
+    // Calculate data distribution
+    const recordTypes = [
+      { name: 'Posts', count: repoData.stats.posts, color: '#667eea' },
+      { name: 'Likes', count: repoData.stats.likes, color: '#764ba2' },
+      { name: 'Reposts', count: repoData.stats.reposts, color: '#f093fb' },
+      { name: 'Follows', count: repoData.stats.follows, color: '#f5576c' },
+      { name: 'Blocks', count: repoData.stats.blocks, color: '#ffecd2' },
+      { name: 'Lists', count: repoData.stats.lists, color: '#fcb69f' },
+      { name: 'List Items', count: repoData.stats.listItems, color: '#a8edea' },
+      { name: 'Other', count: repoData.stats.other, color: '#fed6e3' }
+    ].filter(type => type.count > 0);
+
+    const totalRecords = recordTypes.reduce((sum, type) => sum + type.count, 0);
+    const sortedBySize = [...recordTypes].sort((a, b) => b.count - a.count);
+
     return (
       <div className="test-section">
         <h3>Repository Overview</h3>
@@ -86,49 +101,74 @@ const WrappedTest = () => {
           </div>
         </div>
 
-        <h3>Record Counts by Type</h3>
-        <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-label">Posts</div>
-            <div className="stat-value">{repoData.stats.posts.toLocaleString()}</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">Likes</div>
-            <div className="stat-value">{repoData.stats.likes.toLocaleString()}</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">Reposts</div>
-            <div className="stat-value">{repoData.stats.reposts.toLocaleString()}</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">Follows</div>
-            <div className="stat-value">{repoData.stats.follows.toLocaleString()}</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">Blocks</div>
-            <div className="stat-value">{repoData.stats.blocks.toLocaleString()}</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">Lists</div>
-            <div className="stat-value">{repoData.stats.lists.toLocaleString()}</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">List Items</div>
-            <div className="stat-value">{repoData.stats.listItems.toLocaleString()}</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">Other</div>
-            <div className="stat-value">{repoData.stats.other.toLocaleString()}</div>
+        <h3>Data Distribution</h3>
+        <div className="data-distribution">
+          <div className="distribution-chart">
+            {sortedBySize.map((type, idx) => {
+              const percentage = ((type.count / totalRecords) * 100).toFixed(1);
+              return (
+                <div key={idx} className="distribution-bar-container">
+                  <div className="distribution-label">
+                    <span className="distribution-name">{type.name}</span>
+                    <span className="distribution-stats">
+                      {type.count.toLocaleString()} ({percentage}%)
+                    </span>
+                  </div>
+                  <div className="distribution-bar-bg">
+                    <div 
+                      className="distribution-bar"
+                      style={{
+                        width: `${percentage}%`,
+                        background: type.color
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        <h3>Collections Found</h3>
+        <h3>Largest Data Sections</h3>
+        <div className="largest-sections">
+          {sortedBySize.slice(0, 5).map((type, idx) => {
+            const percentage = ((type.count / totalRecords) * 100).toFixed(1);
+            return (
+              <div key={idx} className="section-card" style={{ borderLeftColor: type.color }}>
+                <div className="section-rank">#{idx + 1}</div>
+                <div className="section-info">
+                  <div className="section-name">{type.name}</div>
+                  <div className="section-count">{type.count.toLocaleString()} records</div>
+                  <div className="section-percentage">{percentage}% of total data</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <h3>All Collections Found</h3>
         <div className="collections-list">
-          {repoData.stats.collections.map((collection, idx) => (
-            <div key={idx} className="collection-item">
-              {collection}
-            </div>
-          ))}
+          {repoData.stats.collections.map((collection, idx) => {
+            const recordCount = (() => {
+              if (collection === 'app.bsky.feed.post') return repoData.stats.posts;
+              if (collection === 'app.bsky.feed.like') return repoData.stats.likes;
+              if (collection === 'app.bsky.feed.repost') return repoData.stats.reposts;
+              if (collection === 'app.bsky.graph.follow') return repoData.stats.follows;
+              if (collection === 'app.bsky.graph.block') return repoData.stats.blocks;
+              if (collection === 'app.bsky.graph.list') return repoData.stats.lists;
+              if (collection === 'app.bsky.graph.listitem') return repoData.stats.listItems;
+              return 0;
+            })();
+            
+            return (
+              <div key={idx} className="collection-item">
+                <span className="collection-name">{collection}</span>
+                {recordCount > 0 && (
+                  <span className="collection-count">{recordCount.toLocaleString()}</span>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     );
@@ -314,6 +354,153 @@ const WrappedTest = () => {
     );
   };
 
+  const renderSamples = () => {
+    if (!repoData) return null;
+
+    const sampleSize = 3;
+
+    return (
+      <div className="test-section">
+        <h3>Sample Records from Each Collection</h3>
+        
+        {/* Posts Samples */}
+        {repoData.records.posts.length > 0 && (
+          <div className="sample-section">
+            <h4>📝 Posts ({repoData.records.posts.length} total)</h4>
+            <div className="samples-container">
+              {repoData.records.posts.slice(0, sampleSize).map((post, idx) => (
+                <div key={idx} className="sample-card">
+                  <div className="sample-header">Sample {idx + 1}</div>
+                  <pre className="sample-json">{JSON.stringify(post, null, 2)}</pre>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Likes Samples */}
+        {repoData.records.likes.length > 0 && (
+          <div className="sample-section">
+            <h4>❤️ Likes ({repoData.records.likes.length} total)</h4>
+            <div className="samples-container">
+              {repoData.records.likes.slice(0, sampleSize).map((like, idx) => (
+                <div key={idx} className="sample-card">
+                  <div className="sample-header">Sample {idx + 1}</div>
+                  <pre className="sample-json">{JSON.stringify(like, null, 2)}</pre>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Reposts Samples */}
+        {repoData.records.reposts.length > 0 && (
+          <div className="sample-section">
+            <h4>🔄 Reposts ({repoData.records.reposts.length} total)</h4>
+            <div className="samples-container">
+              {repoData.records.reposts.slice(0, sampleSize).map((repost, idx) => (
+                <div key={idx} className="sample-card">
+                  <div className="sample-header">Sample {idx + 1}</div>
+                  <pre className="sample-json">{JSON.stringify(repost, null, 2)}</pre>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Follows Samples */}
+        {repoData.records.follows.length > 0 && (
+          <div className="sample-section">
+            <h4>👥 Follows ({repoData.records.follows.length} total)</h4>
+            <div className="samples-container">
+              {repoData.records.follows.slice(0, sampleSize).map((follow, idx) => (
+                <div key={idx} className="sample-card">
+                  <div className="sample-header">Sample {idx + 1}</div>
+                  <pre className="sample-json">{JSON.stringify(follow, null, 2)}</pre>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Blocks Samples */}
+        {repoData.records.blocks.length > 0 && (
+          <div className="sample-section">
+            <h4>🚫 Blocks ({repoData.records.blocks.length} total)</h4>
+            <div className="samples-container">
+              {repoData.records.blocks.slice(0, sampleSize).map((block, idx) => (
+                <div key={idx} className="sample-card">
+                  <div className="sample-header">Sample {idx + 1}</div>
+                  <pre className="sample-json">{JSON.stringify(block, null, 2)}</pre>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Lists Samples */}
+        {repoData.records.lists.length > 0 && (
+          <div className="sample-section">
+            <h4>📋 Lists ({repoData.records.lists.length} total)</h4>
+            <div className="samples-container">
+              {repoData.records.lists.slice(0, sampleSize).map((list, idx) => (
+                <div key={idx} className="sample-card">
+                  <div className="sample-header">Sample {idx + 1}</div>
+                  <pre className="sample-json">{JSON.stringify(list, null, 2)}</pre>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* List Items Samples */}
+        {repoData.records.listItems.length > 0 && (
+          <div className="sample-section">
+            <h4>📌 List Items ({repoData.records.listItems.length} total)</h4>
+            <div className="samples-container">
+              {repoData.records.listItems.slice(0, sampleSize).map((item, idx) => (
+                <div key={idx} className="sample-card">
+                  <div className="sample-header">Sample {idx + 1}</div>
+                  <pre className="sample-json">{JSON.stringify(item, null, 2)}</pre>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Profiles Samples */}
+        {repoData.records.profiles.length > 0 && (
+          <div className="sample-section">
+            <h4>👤 Profiles ({repoData.records.profiles.length} total)</h4>
+            <div className="samples-container">
+              {repoData.records.profiles.slice(0, sampleSize).map((profile, idx) => (
+                <div key={idx} className="sample-card">
+                  <div className="sample-header">Sample {idx + 1}</div>
+                  <pre className="sample-json">{JSON.stringify(profile, null, 2)}</pre>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Other Samples */}
+        {repoData.records.other.length > 0 && (
+          <div className="sample-section">
+            <h4>🔍 Other Collections ({repoData.records.other.length} total)</h4>
+            <div className="samples-container">
+              {repoData.records.other.slice(0, sampleSize).map((item, idx) => (
+                <div key={idx} className="sample-card">
+                  <div className="sample-header">Sample {idx + 1} - {item.type || 'Unknown'}</div>
+                  <pre className="sample-json">{JSON.stringify(item, null, 2)}</pre>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderRaw = () => {
     if (!repoData) return null;
 
@@ -400,6 +587,12 @@ const WrappedTest = () => {
                 Analysis
               </button>
               <button
+                className={selectedTab === 'samples' ? 'tab-active' : ''}
+                onClick={() => setSelectedTab('samples')}
+              >
+                Samples
+              </button>
+              <button
                 className={selectedTab === 'raw' ? 'tab-active' : ''}
                 onClick={() => setSelectedTab('raw')}
               >
@@ -413,6 +606,7 @@ const WrappedTest = () => {
               {selectedTab === 'likes' && renderLikes()}
               {selectedTab === 'follows' && renderFollows()}
               {selectedTab === 'analysis' && renderAnalysis()}
+              {selectedTab === 'samples' && renderSamples()}
               {selectedTab === 'raw' && renderRaw()}
             </div>
           </>

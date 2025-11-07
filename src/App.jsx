@@ -23,6 +23,8 @@ import Login from './components/Login/Login';
 import LoginCallback from './components/Login/LoginCallback';
 import Verifier from './components/Verifier/Verifier';
 import Canceler from './components/Canceler/Canceler';
+import WrappedTest from './components/WrappedTest/WrappedTest';
+import Wrapped from './components/Wrapped/Wrapped';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import "./App.css";
@@ -72,6 +74,9 @@ const App = () => {
                 <Route path="/shortcut" element={<Shortcut />} />
                 <Route path="/zen" element={<ZenPage />} />
                 <Route path="/methodology" element={<ScoringMethodology />} />
+                <Route path="/wrapped-test" element={<WrappedTest />} />
+                <Route path="/wrapped" element={<Wrapped />} />
+                <Route path="/wrapped/:username" element={<Wrapped />} />
                 
                 {/* Omnifeed Routes - Temporarily Commented Out */}
                 {/*

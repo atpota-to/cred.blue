@@ -1,7 +1,6 @@
 import React from 'react';
 import './ScoringMethodology.css';
 import ScoreGauge from '../UserProfile/ScoreGauge';
-import { Link } from 'react-router-dom';
 import RelatedPagesNav from '../common/RelatedPagesNav';
 
 const ScoringMethodology = () => {
@@ -55,9 +54,6 @@ const ScoringMethodology = () => {
         </ol>
         <p>
           This is not an exhaustive list by any means, but it should get you started. The goal of the cred.blue score isn't to attempt to max it out... rather, the point is to foster healthy behavior and activity that benefits the entire community.
-        </p>
-        <p>
-          With that being said, check out the <Link to="/resources">resources page</Link> and toggle the "impacts score" filter to see some third-party apps that do have an influenece.
         </p>
 
         {/* Replace the old definitions link with the new RelatedPagesNav component */}

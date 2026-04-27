@@ -127,9 +127,8 @@ const Navbar = () => {
 
   const resourcesDropdown = {
     title: "resources",
-    path: "/resources",
+    path: "/alt-text",
     items: [
-      { title: "library", path: "/resources" },
       { title: "alt text rating", path: "/alt-text" },
       // { title: "omnifeed", path: "/omnifeed" }, // Temporarily removed
       { title: "verifier", path: "/verifier" }
